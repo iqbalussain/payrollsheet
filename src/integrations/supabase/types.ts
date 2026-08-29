@@ -14,7 +14,126 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      employees: {
+        Row: {
+          created_at: string
+          hourly_rate: number
+          id: number
+          id_number: string
+          name: string
+          status: string
+          trade: string
+        }
+        Insert: {
+          created_at?: string
+          hourly_rate?: number
+          id?: number
+          id_number?: string
+          name: string
+          status?: string
+          trade?: string
+        }
+        Update: {
+          created_at?: string
+          hourly_rate?: number
+          id?: number
+          id_number?: string
+          name?: string
+          status?: string
+          trade?: string
+        }
+        Relationships: []
+      }
+      payroll_batches: {
+        Row: {
+          created_at: string
+          foreman: string
+          id: string
+          month: string
+          site: string
+        }
+        Insert: {
+          created_at?: string
+          foreman?: string
+          id?: string
+          month: string
+          site?: string
+        }
+        Update: {
+          created_at?: string
+          foreman?: string
+          id?: string
+          month?: string
+          site?: string
+        }
+        Relationships: []
+      }
+      payroll_lines: {
+        Row: {
+          batch_id: string
+          created_at: string
+          employee_id: number
+          food_deduction: number
+          foreman: string
+          hours: number
+          id: string
+          month: string
+          net_salary: number
+          new_advance: number
+          other_deduction: number
+          paid: number
+          prev_advance: number
+          rate: number
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          employee_id: number
+          food_deduction?: number
+          foreman?: string
+          hours?: number
+          id?: string
+          month: string
+          net_salary?: number
+          new_advance?: number
+          other_deduction?: number
+          paid?: number
+          prev_advance?: number
+          rate?: number
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          employee_id?: number
+          food_deduction?: number
+          foreman?: string
+          hours?: number
+          id?: string
+          month?: string
+          net_salary?: number
+          new_advance?: number
+          other_deduction?: number
+          paid?: number
+          prev_advance?: number
+          rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_lines_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
