@@ -59,10 +59,34 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-navy: var(--navy);
+  --color-navy-dark: var(--navy-dark);
+  --color-navy-soft: var(--navy-soft);
+  --color-gold: var(--gold);
+  --color-gold-dark: var(--gold-dark);
+  --color-money: var(--money);
+  --color-danger: var(--danger);
+  --color-warn: var(--warn);
+  --color-canvas: var(--canvas);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
 }
+
 
 :root {
   --radius: 0.625rem;
+  --navy: oklch(0.3 0.075 264);
+  --navy-dark: oklch(0.24 0.07 264);
+  --navy-soft: oklch(0.95 0.015 264);
+  --gold: oklch(0.68 0.125 82);
+  --gold-dark: oklch(0.6 0.115 82);
+  --money: oklch(0.5 0.11 155);
+  --danger: oklch(0.53 0.2 27);
+  --warn: oklch(0.62 0.14 70);
+  --canvas: oklch(0.975 0.003 260);
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-display: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
   --card: oklch(1 0 0);
