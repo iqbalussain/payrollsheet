@@ -38,7 +38,7 @@ const emptyLine = (): PayrollLine => ({
 });
 
 export function PayrollTab({ employees, batches, onSave, onDelete, saving, notify }: Props) {
-  const [month, setMonth] = useState(MONTHS[0]);
+  const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
 

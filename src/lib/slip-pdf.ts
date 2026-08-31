@@ -115,7 +115,7 @@ export function downloadSlips(slips: SlipInput[]) {
   });
   const name =
     slips.length === 1
-      ? `salary-slip-${slips[0].employee.name.replace(/\s+/g, "-")}-${slips[0].month}.pdf`
-      : `salary-slips-${slips[0].month}.pdf`;
+      ? `salary-slip-${slips[0]!.employee.name.replace(/\s+/g, "-")}-${slips[0]!.month}.pdf`
+      : `salary-slips-${slips[0]!.month}.pdf`;
   doc.save(name);
 }

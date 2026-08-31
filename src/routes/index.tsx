@@ -108,7 +108,7 @@ function Index() {
     }
     saveEmployee.mutate(
       {
-        id: form.id,
+        ...(form.id ? { id: form.id } : {}),
         name: form.name.trim(),
         trade: form.trade,
         id_number: form.id_number,

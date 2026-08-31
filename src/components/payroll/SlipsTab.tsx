@@ -22,7 +22,7 @@ interface Props {
 }
 
 export function SlipsTab({ employees, batches, notify }: Props) {
-  const [month, setMonth] = useState(MONTHS[0]);
+  const [month, setMonth] = useState(MONTHS[0]!);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
