@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { db as supabase } from "@/integrations/supabase/external-client";
 import type { Employee, PayrollBatch, PayrollLine } from "./payroll";
 import { toNum } from "./payroll";
 
