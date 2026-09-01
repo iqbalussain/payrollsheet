@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { db as supabase } from "@/integrations/supabase/external-client";
-import type { Employee, PayrollBatch, PayrollLine } from "./payroll";
+import { db as supabase, dbAny } from "@/integrations/supabase/external-client";
+import type { AdvanceTx, Employee, PayrollBatch, PayrollLine } from "./payroll";
 import { toNum } from "./payroll";
 
 export function useEmployees() {
@@ -166,5 +166,68 @@ export function useUpdateLineForeman() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["payroll_batches"] }),
+  });
+}
+
+/* ---------------- Advance transactions ---------------- */
+
+export function useAdvances() {
+  return useQuery({
+    queryKey: ["advance_transactions"],
+    queryFn: async (): Promise<AdvanceTx[]> => {
+      const { data, error } = await dbAny
+        .from("advance_transactions")
+        .select("id, employee_id, date, amount, reason, payment_method, notes")
+        .order("date", { ascending: false });
+      if (error) throw error;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((a: any) => ({
+        id: String(a.id),
+        employee_id: Number(a.employee_id),
+        date: a.date,
+        amount: Number(a.amount),
+        reason: a.reason ?? "",
+        payment_method: a.payment_method ?? "Cash",
+        notes: a.notes ?? "",
+      }));
+    },
+  });
+}
+
+export function useSaveAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tx: Partial<AdvanceTx> & { id?: string }) => {
+      const payload = {
+        employee_id: Number(tx.employee_id),
+        date: tx.date,
+        amount: toNum(tx.amount),
+        reason: tx.reason ?? "",
+        payment_method: tx.payment_method ?? "Cash",
+        notes: tx.notes ?? "",
+      };
+      if (tx.id) {
+        const { error } = await dbAny
+          .from("advance_transactions")
+          .update(payload)
+          .eq("id", tx.id);
+        if (error) throw error;
+      } else {
+        const { error } = await dbAny.from("advance_transactions").insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["advance_transactions"] }),
+  });
+}
+
+export function useDeleteAdvance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await dbAny.from("advance_transactions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["advance_transactions"] }),
   });
 }

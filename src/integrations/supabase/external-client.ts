@@ -24,3 +24,7 @@ export const db = new Proxy({} as ReturnType<typeof create>, {
     return Reflect.get(_client, prop, receiver);
   },
 });
+
+/** Untyped view of the same client, for tables added outside the generated types. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const dbAny = db as any;
