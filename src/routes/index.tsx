@@ -8,6 +8,7 @@ import {
   History,
   Save,
   Users,
+  Banknote,
   AlertTriangle,
 } from "lucide-react";
 
@@ -16,6 +17,7 @@ import { PayrollTab } from "@/components/payroll/PayrollTab";
 import { HistoryTab } from "@/components/payroll/HistoryTab";
 import { SlipsTab } from "@/components/payroll/SlipsTab";
 import { CostTab } from "@/components/payroll/CostTab";
+import { AdvancesTab } from "@/components/payroll/AdvancesTab";
 import {
   EmployeeModal,
   type EmployeeForm,
@@ -27,8 +29,11 @@ import {
   useEmployees,
   useSaveBatch,
   useSaveEmployee,
+  useAdvances,
+  useSaveAdvance,
+  useDeleteAdvance,
 } from "@/lib/payroll-data";
-import type { Employee, EmployeeStatus, PayrollBatch } from "@/lib/payroll";
+import type { AdvanceTx, Employee, EmployeeStatus, PayrollBatch } from "@/lib/payroll";
 
 const TITLE = "Site Payroll Manager — Wages, Advances & Salary Slips";
 const DESCRIPTION =
@@ -51,6 +56,7 @@ export const Route = createFileRoute("/")({
 const TABS = [
   { id: "employees", label: "Employees", icon: Users },
   { id: "payroll", label: "Monthly Payroll", icon: Save },
+  { id: "advances", label: "Advances", icon: Banknote },
   { id: "history", label: "Employee History", icon: History },
   { id: "slips", label: "Salary Slips", icon: FileDown },
   { id: "cost", label: "Cost Allocation", icon: BarChart2 },
@@ -77,9 +83,13 @@ function Index() {
   const saveEmployee = useSaveEmployee();
   const saveBatch = useSaveBatch();
   const deleteBatch = useDeleteBatch();
+  const advancesQuery = useAdvances();
+  const saveAdvance = useSaveAdvance();
+  const deleteAdvance = useDeleteAdvance();
 
   const employees: Employee[] = employeesQuery.data ?? [];
   const batches: PayrollBatch[] = batchesQuery.data ?? [];
+  const advances: AdvanceTx[] = advancesQuery.data ?? [];
 
   const notify = (msg: string, tone: "ok" | "warn" = "ok") => setToast({ msg, tone });
 
@@ -125,7 +135,7 @@ function Index() {
     );
   };
 
-  const error = employeesQuery.error ?? batchesQuery.error;
+  const error = employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error;
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-foreground">
@@ -185,6 +195,7 @@ function Index() {
           <PayrollTab
             employees={employees}
             batches={batches}
+            advances={advances}
             saving={saveBatch.isPending}
             notify={notify}
             onSave={(batch) =>
@@ -202,7 +213,33 @@ function Index() {
           />
         )}
 
-        {tab === "history" && <HistoryTab employees={employees} batches={batches} />}
+        {tab === "advances" && (
+          <AdvancesTab
+            employees={employees}
+            batches={batches}
+            advances={advances}
+            saving={saveAdvance.isPending}
+            notify={notify}
+            onSave={(tx, done) =>
+              saveAdvance.mutate(tx, {
+                onSuccess: () => {
+                  notify("Advance saved.");
+                  done();
+                },
+                onError: (e) => notify((e as Error).message, "warn"),
+              })
+            }
+            onDelete={(id) =>
+              deleteAdvance.mutate(id, {
+                onSuccess: () => notify("Advance deleted."),
+                onError: (e) => notify((e as Error).message, "warn"),
+              })
+            }
+          />
+        )}
+        {tab === "history" && (
+          <HistoryTab employees={employees} batches={batches} advances={advances} />
+        )}
         {tab === "slips" && (
           <SlipsTab employees={employees} batches={batches} notify={notify} />
         )}

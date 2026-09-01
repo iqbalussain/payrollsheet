@@ -184,3 +184,110 @@ export function lockedEmployeeIds(
     .forEach((b) => b.lines.forEach((l) => l.employee_id && set.add(String(l.employee_id))));
   return set;
 }
+
+/* ---------------- Advance management ---------------- */
+
+export interface AdvanceTx {
+  id: string;
+  employee_id: number;
+  date: string;
+  amount: number;
+  reason: string;
+  payment_method: string;
+  notes: string;
+}
+
+export const PAYMENT_METHODS = ["Cash", "Bank"] as const;
+
+export const ADVANCE_REASONS = [
+  "Personal",
+  "Medical",
+  "Family support",
+  "Travel / ticket",
+  "Emergency",
+  "Other",
+];
+
+export function txMonth(date: string) {
+  return (date || "").slice(0, 7);
+}
+
+/** Advances issued to an employee through the Advance Management module. */
+export function advancesIssued(
+  employeeId: number | string,
+  advances: AdvanceTx[],
+  beforeMonth?: string,
+) {
+  return advances
+    .filter((a) => String(a.employee_id) === String(employeeId))
+    .filter((a) => (beforeMonth ? txMonth(a.date) < beforeMonth : true))
+    .reduce((s, a) => s + toNum(a.amount), 0);
+}
+
+/** Advance recovered through payroll (prev_advance column). */
+export function advancesRecovered(
+  employeeId: number | string,
+  batches: PayrollBatch[],
+  beforeMonth?: string,
+) {
+  let total = 0;
+  batches
+    .filter((b) => (beforeMonth ? b.month < beforeMonth : true))
+    .forEach((b) =>
+      b.lines
+        .filter((l) => String(l.employee_id) === String(employeeId))
+        .forEach((l) => {
+          total += toNum(l.prev_advance);
+        }),
+    );
+  return total;
+}
+
+/** Advances added directly on a payroll line (new_advance column). */
+function payrollAdvancesIssued(
+  employeeId: number | string,
+  batches: PayrollBatch[],
+  beforeMonth?: string,
+) {
+  let total = 0;
+  batches
+    .filter((b) => (beforeMonth ? b.month < beforeMonth : true))
+    .forEach((b) =>
+      b.lines
+        .filter((l) => String(l.employee_id) === String(employeeId))
+        .forEach((l) => {
+          total += toNum(l.new_advance);
+        }),
+    );
+  return total;
+}
+
+/**
+ * Outstanding advance carried INTO `month`, combining advance transactions and
+ * payroll-line advances, minus everything already recovered in earlier months.
+ */
+export function advanceCarryForward(
+  employeeId: number | string,
+  month: string,
+  batches: PayrollBatch[],
+  advances: AdvanceTx[] = [],
+) {
+  const bal =
+    advancesIssued(employeeId, advances, month) +
+    payrollAdvancesIssued(employeeId, batches, month) -
+    advancesRecovered(employeeId, batches, month);
+  return Math.max(0, Math.round(bal * 1000) / 1000);
+}
+
+/** Total advance still outstanding across all months. */
+export function advanceOutstanding(
+  employeeId: number | string,
+  batches: PayrollBatch[],
+  advances: AdvanceTx[] = [],
+) {
+  const bal =
+    advancesIssued(employeeId, advances) +
+    payrollAdvancesIssued(employeeId, batches) -
+    advancesRecovered(employeeId, batches);
+  return Math.max(0, Math.round(bal * 1000) / 1000);
+}
