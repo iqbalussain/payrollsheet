@@ -3,11 +3,9 @@ import { History, FileDown } from "lucide-react";
 import {
   employeeRows,
   fmt,
-  getCarryForward,
   lineBalance,
   lineGross,
   monthLabel,
-  outstandingAdvance,
   advanceOutstanding,
   advanceCarryForward,
   type AdvanceTx,
@@ -222,8 +220,66 @@ export function HistoryTab({ employees, batches, advances }: Props) {
               </table>
             </div>
           </div>
+          <div className={card + " overflow-hidden"}>
+            <p className="border-b border-border bg-navy-soft/60 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-navy">
+              Advance transactions
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] text-xs">
+                <thead>
+                  <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    <th className="px-3 py-2">Date</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2">Reason</th>
+                    <th className="px-3 py-2">Method</th>
+                    <th className="px-3 py-2">Notes</th>
+                    <th className="px-3 py-2 text-right">Balance after month</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {empAdvances.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                        No advances issued to this employee yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    empAdvances.map((a) => (
+                      <tr key={a.id} className="border-b border-border last:border-0">
+                        <td className="px-3 py-2.5 font-semibold text-navy">{a.date}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-warn">
+                          {fmt(toNum(a.amount))}
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-600">{a.reason || "\u2014"}</td>
+                        <td className="px-3 py-2.5 text-slate-600">{a.payment_method}</td>
+                        <td className="px-3 py-2.5 text-slate-500">{a.notes || "\u2014"}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold">
+                          {fmt(
+                            advanceCarryForward(
+                              employee.id,
+                              nextMonthOf(a.date),
+                              batches,
+                              advances,
+                            ),
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </>
       )}
     </div>
   );
+}
+
+/** First day-month after the month of `date`, used for carry-forward display. */
+function nextMonthOf(date: string) {
+  const y = Number(date.slice(0, 4));
+  const m = Number(date.slice(5, 7));
+  const d = new Date(y, m, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
