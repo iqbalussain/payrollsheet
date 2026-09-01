@@ -8,6 +8,9 @@ import {
   lineGross,
   monthLabel,
   outstandingAdvance,
+  advanceOutstanding,
+  advanceCarryForward,
+  type AdvanceTx,
   rowTotals,
   toNum,
   type Employee,
@@ -19,9 +22,10 @@ import { btnGold, btnOutline, card, select } from "./ui";
 interface Props {
   employees: Employee[];
   batches: PayrollBatch[];
+  advances: AdvanceTx[];
 }
 
-export function HistoryTab({ employees, batches }: Props) {
+export function HistoryTab({ employees, batches, advances }: Props) {
   const [employeeId, setEmployeeId] = useState("");
 
   const employee = employees.find((e) => String(e.id) === employeeId) || null;
@@ -30,7 +34,12 @@ export function HistoryTab({ employees, batches }: Props) {
     [batches, employee],
   );
   const totals = rowTotals(rows);
-  const outstanding = employee ? outstandingAdvance(employee.id, batches) : 0;
+  const outstanding = employee ? advanceOutstanding(employee.id, batches, advances) : 0;
+  const empAdvances = employee
+    ? advances
+        .filter((a) => String(a.employee_id) === String(employee.id))
+        .sort((a, b) => b.date.localeCompare(a.date))
+    : [];
 
   const exportAll = () => {
     if (!employee) return;
@@ -39,8 +48,8 @@ export function HistoryTab({ employees, batches }: Props) {
         employee,
         month: row.month,
         row,
-        carriedForward: getCarryForward(employee.id, row.month, batches),
-        outstandingAdvance: outstandingAdvance(employee.id, batches),
+        carriedForward: advanceCarryForward(employee.id, row.month, batches, advances),
+        outstandingAdvance: outstanding,
       })),
     );
   };
@@ -171,10 +180,11 @@ export function HistoryTab({ employees, batches }: Props) {
                                   employee,
                                   month: r.month,
                                   row: r,
-                                  carriedForward: getCarryForward(
+                                  carriedForward: advanceCarryForward(
                                     employee.id,
                                     r.month,
                                     batches,
+                                    advances,
                                   ),
                                   outstandingAdvance: outstanding,
                                 },

@@ -4,11 +4,12 @@ import {
   MONTHS,
   computeNet,
   fmt,
-  getCarryForward,
+  advanceCarryForward,
   lineGross,
   lockedEmployeeIds,
   monthLabel,
   toNum,
+  type AdvanceTx,
   type Employee,
   type PayrollBatch,
   type PayrollLine,
@@ -18,6 +19,7 @@ import { btnGold, btnIcon, btnOutline, btnPrimary, card, input, inputSm, select 
 interface Props {
   employees: Employee[];
   batches: PayrollBatch[];
+  advances: AdvanceTx[];
   onSave: (batch: PayrollBatch) => void;
   onDelete: (id: string) => void;
   saving: boolean;
@@ -37,7 +39,15 @@ const emptyLine = (): PayrollLine => ({
   paid: "",
 });
 
-export function PayrollTab({ employees, batches, onSave, onDelete, saving, notify }: Props) {
+export function PayrollTab({
+  employees,
+  batches,
+  advances,
+  onSave,
+  onDelete,
+  saving,
+  notify,
+}: Props) {
   const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
@@ -96,7 +106,7 @@ export function PayrollTab({ employees, batches, onSave, onDelete, saving, notif
     setLine(idx, {
       employee_id: value ? Number(value) : "",
       rate: emp ? emp.hourly_rate : "",
-      prev_advance: emp ? getCarryForward(emp.id, month, batches) : "",
+      prev_advance: emp ? advanceCarryForward(emp.id, month, batches, advances) : "",
     });
   };
 
@@ -216,7 +226,7 @@ export function PayrollTab({ employees, batches, onSave, onDelete, saving, notif
               <tbody>
                 {draft.lines.map((l, idx) => {
                   const carry = l.employee_id
-                    ? getCarryForward(l.employee_id, month, batches)
+                    ? advanceCarryForward(l.employee_id, month, batches, advances)
                     : 0;
                   return (
                     <tr key={idx} className="border-b border-border align-top last:border-0">
