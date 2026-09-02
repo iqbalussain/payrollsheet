@@ -128,6 +128,20 @@ export function PayrollTab({
       notify("Add at least one employee before saving.", "warn");
       return;
     }
+    const over = draft.lines.find((l) => {
+      if (!l.employee_id) return false;
+      const avail =
+        advanceCarryForward(l.employee_id, month, batches, advances) + toNum(l.new_advance);
+      return toNum(l.prev_advance) > avail + 0.001;
+    });
+    if (over) {
+      const emp = employees.find((e) => String(e.id) === String(over.employee_id));
+      notify(
+        `Advance deduction for ${emp?.name ?? "employee"} exceeds their outstanding advance.`,
+        "warn",
+      );
+      return;
+    }
     onSave({ ...draft, month });
     setDraft(null);
   };
