@@ -1,14 +1,36 @@
-# Welcome to your Lovable project
+# Payroll Companion
+
+Analyse my old simple app and create smae like that with wonderful ideas and theme should be same like that elegant and all the buttons should visible clearly. And Make mentioned these changes:
+
+Employees: Employee master fields must be { id, name, trade, idNumber, salary/hr, status }, where status = Active / Holiday / Cancelled. Edit must use the same fields.
+
+Monthly Payroll: The hard-hat button must allow changing the foreman for individual employees/lines, not only the whole batch.
+
+Prevent duplicate payroll: For the selected month, once an employee is added to one payroll batch, automatically exclude/block that employee from all other batches for the same month. This must prevent accidental double salary payment.
+
+Employee History: Selecting an employee must show month-by-month hours, salary/hr, gross salary, food deduction, previous/outstanding advance, new advance, other deductions, paid amount and remaining balance.
+
+Salary Slips: Allow selecting one or multiple employees and generate/download individual salary slips as PDF.
+
+Employee Details: Clicking View on an employee should immediately open a modal showing complete monthly payroll history and totals: hours, salary, food, advance, deductions, paid and outstanding balance.
+
+Advance carry-forward: Automatically carry each employee's unpaid/outstanding advance from the previous month into the next month's advance/deduction calculation. Never lose or duplicate the balance.
+
+Supabase: Replace browser/session/local persistence with Supabase database storage. Preserve existing data structure where practical and use proper relational tables for employees, payroll batches and payroll lines.
+
+Important: modify the existing application only, preserve the current layout/theme, calculations and Cost Allocation functionality. Do not remove existing working features. Make the smallest clean changes necessary and ensure existing payroll data is not lost.
 
 This project was built with [Lovable](https://lovable.dev).
 
+**Live app**: https://payrollsheet.lovable.app
+
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d2cf1806-a43a-473e-8851-0180d7f23309).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +42,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
