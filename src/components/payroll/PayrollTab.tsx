@@ -248,10 +248,20 @@ export function PayrollTab({
                             </option>
                           ))}
                         </select>
-                        {l.employee_id !== "" && carry > 0 && (
-                          <p className="mt-1 text-[10px] font-semibold text-warn">
-                            Carried advance: {fmt(carry)}
-                          </p>
+                        {l.employee_id !== "" && (carry > 0 || toNum(l.new_advance) > 0) && (
+                          <div className="mt-1 space-y-0.5 text-[10px] font-semibold">
+                            <p className="text-warn">Outstanding from previous months: {fmt(carry)}</p>
+                            <p className="text-slate-600">
+                              Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} ·
+                              {" "}Carries to next month:{" "}
+                              {fmt(
+                                Math.max(
+                                  0,
+                                  carry - toNum(l.prev_advance) + toNum(l.new_advance),
+                                ),
+                              )}
+                            </p>
+                          </div>
                         )}
                       </td>
                       <td className="px-2 py-2">
