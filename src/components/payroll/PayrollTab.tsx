@@ -347,7 +347,7 @@ export function PayrollTab({
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1080px] text-xs">
-              <thead>
+              <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2">Employee</th>
                   <th className="px-2 py-2">Foreman</th>
