@@ -92,27 +92,12 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
     );
   }
 
-  return (
-    <div className="relative min-w-[190px]">
-      <Search
-        size={13}
-        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-      <input
-        autoFocus
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Search name, trade or ID…"
-        className={inputSm + " w-full pl-7"}
-      />
-      {open && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-          {results.length === 0 ? (
+  const list = (
+    <div
+      style={rect ? { top: rect.top, left: rect.left, width: rect.width } : undefined}
+      className="fixed z-[70] max-h-64 overflow-auto rounded-md border border-slate-200 bg-white shadow-xl"
+    >
+      {results.length === 0 ? (
             <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
           ) : (
             results.map((e) => {
