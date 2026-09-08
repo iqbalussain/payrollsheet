@@ -38,7 +38,25 @@ interface EmployeeSearchProps {
 function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const selected = employees.find((e) => String(e.id) === String(value));
+
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = boxRef.current?.getBoundingClientRect();
+      if (r) setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 240) });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
