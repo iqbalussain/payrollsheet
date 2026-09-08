@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { UserPlus } from "lucide-react";
 import { HardHat, Plus, Save, Trash2, X, Lock, Pencil, Search } from "lucide-react";
 import {
   MONTHS,
