@@ -506,7 +506,7 @@ export function PayrollTab({
             </table>
           </div>
 
-          <div className="border-t border-border px-4 py-3">
+          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
             <button
               type="button"
               onClick={() => setDraft({ ...draft, lines: [...draft.lines, emptyLine()] })}
@@ -514,6 +514,11 @@ export function PayrollTab({
             >
               <Plus size={15} /> Add employee line
             </button>
+            {onNewEmployee && (
+              <button type="button" onClick={onNewEmployee} className={btnOutline}>
+                <UserPlus size={15} /> New employee
+              </button>
+            )}
           </div>
         </div>
       )}
