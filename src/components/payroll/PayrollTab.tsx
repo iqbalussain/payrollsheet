@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { UserPlus } from "lucide-react";
 import { HardHat, Plus, Save, Trash2, X, Lock, Pencil, Search } from "lucide-react";
 import {
   MONTHS,
@@ -24,6 +26,7 @@ interface Props {
   onDelete: (id: string) => void;
   saving: boolean;
   notify: (msg: string, tone?: "ok" | "warn") => void;
+  onNewEmployee?: () => void;
 }
 
 interface EmployeeSearchProps {
@@ -36,7 +39,25 @@ interface EmployeeSearchProps {
 function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const selected = employees.find((e) => String(e.id) === String(value));
+
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = boxRef.current?.getBoundingClientRect();
+      if (r) setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 240) });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -72,27 +93,12 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
     );
   }
 
-  return (
-    <div className="relative min-w-[190px]">
-      <Search
-        size={13}
-        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-      <input
-        autoFocus
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Search name, trade or ID…"
-        className={inputSm + " w-full pl-7"}
-      />
-      {open && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-          {results.length === 0 ? (
+  const list = (
+    <div
+      style={rect ? { top: rect.top, left: rect.left, width: rect.width } : undefined}
+      className="fixed z-[70] max-h-64 overflow-auto rounded-md border border-slate-200 bg-white shadow-xl"
+    >
+      {results.length === 0 ? (
             <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
           ) : (
             results.map((e) => {
@@ -121,9 +127,29 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                 </button>
               );
             })
-          )}
-        </div>
       )}
+    </div>
+  );
+
+  return (
+    <div ref={boxRef} className="relative min-w-[190px]">
+      <Search
+        size={13}
+        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+      <input
+        autoFocus
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Search name, trade or ID…"
+        className={inputSm + " w-full pl-7"}
+      />
+      {open && typeof document !== "undefined" && createPortal(list, document.body)}
     </div>
   );
 }
@@ -149,6 +175,7 @@ export function PayrollTab({
   onDelete,
   saving,
   notify,
+  onNewEmployee,
 }: Props) {
   const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
@@ -281,8 +308,8 @@ export function PayrollTab({
       )}
 
       {draft && (
-        <div className={card + " overflow-hidden"}>
-          <div className="flex flex-wrap items-end gap-3 border-b border-border bg-navy-soft/60 px-4 py-3">
+        <div className={card + " overflow-visible"}>
+          <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-t-xl border-b border-border bg-navy-soft px-4 py-3">
             <div className="min-w-[160px] flex-1">
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 Site
@@ -320,9 +347,9 @@ export function PayrollTab({
             ))}
           </datalist>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto xl:overflow-x-visible">
             <table className="w-full min-w-[1080px] text-xs">
-              <thead>
+              <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2">Employee</th>
                   <th className="px-2 py-2">Foreman</th>
@@ -481,7 +508,7 @@ export function PayrollTab({
             </table>
           </div>
 
-          <div className="border-t border-border px-4 py-3">
+          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
             <button
               type="button"
               onClick={() => setDraft({ ...draft, lines: [...draft.lines, emptyLine()] })}
@@ -489,6 +516,11 @@ export function PayrollTab({
             >
               <Plus size={15} /> Add employee line
             </button>
+            {onNewEmployee && (
+              <button type="button" onClick={onNewEmployee} className={btnOutline}>
+                <UserPlus size={15} /> New employee
+              </button>
+            )}
           </div>
         </div>
       )}
