@@ -126,9 +126,29 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                 </button>
               );
             })
-          )}
-        </div>
       )}
+    </div>
+  );
+
+  return (
+    <div ref={boxRef} className="relative min-w-[190px]">
+      <Search
+        size={13}
+        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+      <input
+        autoFocus
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Search name, trade or ID…"
+        className={inputSm + " w-full pl-7"}
+      />
+      {open && typeof document !== "undefined" && createPortal(list, document.body)}
     </div>
   );
 }
