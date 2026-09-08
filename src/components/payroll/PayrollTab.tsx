@@ -26,6 +26,7 @@ interface Props {
   onDelete: (id: string) => void;
   saving: boolean;
   notify: (msg: string, tone?: "ok" | "warn") => void;
+  onNewEmployee?: () => void;
 }
 
 interface EmployeeSearchProps {
@@ -174,6 +175,7 @@ export function PayrollTab({
   onDelete,
   saving,
   notify,
+  onNewEmployee,
 }: Props) {
   const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);

@@ -198,6 +198,10 @@ function Index() {
             advances={advances}
             saving={saveBatch.isPending}
             notify={notify}
+            onNewEmployee={() => {
+              setForm(emptyForm);
+              setMode("new");
+            }}
             onSave={(batch) =>
               saveBatch.mutate(batch, {
                 onSuccess: () => notify("Payroll batch saved."),
