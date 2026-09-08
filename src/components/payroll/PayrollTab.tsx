@@ -345,7 +345,7 @@ export function PayrollTab({
             ))}
           </datalist>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto xl:overflow-x-visible">
             <table className="w-full min-w-[1080px] text-xs">
               <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
