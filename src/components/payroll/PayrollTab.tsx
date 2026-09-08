@@ -306,8 +306,8 @@ export function PayrollTab({
       )}
 
       {draft && (
-        <div className={card + " overflow-hidden"}>
-          <div className="flex flex-wrap items-end gap-3 border-b border-border bg-navy-soft/60 px-4 py-3">
+        <div className={card + " overflow-visible"}>
+          <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-t-xl border-b border-border bg-navy-soft px-4 py-3">
             <div className="min-w-[160px] flex-1">
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 Site
