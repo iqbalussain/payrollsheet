@@ -353,11 +353,12 @@ export function PayrollTab({
             ))}
           </datalist>
 
-          <div className="overflow-x-auto xl:overflow-x-visible">
+          <div className="hidden overflow-x-auto md:block xl:overflow-x-visible">
             <table className="w-full min-w-[1080px] text-xs">
               <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2">Employee</th>
+                  <th className="px-2 py-2">Emp ID</th>
                   <th className="px-2 py-2">Foreman</th>
                   <th className="px-2 py-2 text-right">Hours</th>
                   <th className="px-2 py-2 text-right">Rate</th>
@@ -401,6 +402,9 @@ export function PayrollTab({
                             </p>
                           </div>
                         )}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2 font-mono text-[11px] text-slate-600">
+                        {empIdLabel(employees, l.employee_id)}
                       </td>
                       <td className="px-2 py-2">
                         {foremanLine === idx ? (
