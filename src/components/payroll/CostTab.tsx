@@ -1,16 +1,21 @@
 import { useMemo, useState } from "react";
-import { fmt, MONTHS, monthLabel, toNum, type PayrollBatch } from "@/lib/payroll";
-import { card, select } from "./ui";
+import { List } from "lucide-react";
+import { fmt, MONTHS, monthLabel, toNum, type Employee, type PayrollBatch } from "@/lib/payroll";
+import { btnGold, card, select } from "./ui";
+import { CostDetailsModal } from "./CostDetailsModal";
 
 type GroupBy = "site" | "foreman" | "site+foreman";
 
 interface Props {
   batches: PayrollBatch[];
+  employees: Employee[];
+  notify?: (msg: string, tone?: "ok" | "warn") => void;
 }
 
-export function CostTab({ batches }: Props) {
+export function CostTab({ batches, employees, notify }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>("site");
   const [filterMonth, setFilterMonth] = useState("");
+  const [listOpen, setListOpen] = useState(false);
 
   const costRows = useMemo(() => {
     const buckets: Record<
@@ -99,10 +104,22 @@ export function CostTab({ batches }: Props) {
             </button>
           ))}
         </div>
-        <p className="ml-auto text-xs text-muted-foreground">
+        <button onClick={() => setListOpen(true)} className={btnGold + " ml-auto"}>
+          <List size={15} /> View List
+        </button>
+        <p className="w-full text-xs text-muted-foreground lg:w-auto">
           Cost is allocated per line (hours × rate) — no double counting across foremen or sites.
         </p>
       </div>
+
+      <CostDetailsModal
+        open={listOpen}
+        onClose={() => setListOpen(false)}
+        batches={batches}
+        employees={employees}
+        month={filterMonth}
+        notify={notify}
+      />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[

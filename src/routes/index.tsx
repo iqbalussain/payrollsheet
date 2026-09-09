@@ -247,7 +247,9 @@ function Index() {
         {tab === "slips" && (
           <SlipsTab employees={employees} batches={batches} notify={notify} />
         )}
-        {tab === "cost" && <CostTab batches={batches} />}
+        {tab === "cost" && (
+          <CostTab batches={batches} employees={employees} notify={notify} />
+        )}
       </div>
 
       <EmployeeModal
