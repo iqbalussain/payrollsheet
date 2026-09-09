@@ -154,6 +154,40 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 }
 
+function SlideToSave({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+  const [v, setV] = useState(0);
+  return (
+    <div className="sticky bottom-2 rounded-xl border border-gold/50 bg-gold/10 p-2">
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={v}
+        disabled={saving}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (n > 92) {
+            setV(0);
+            onSave();
+          } else setV(n);
+        }}
+        onPointerUp={() => setV(0)}
+        className="h-8 w-full cursor-grab accent-gold"
+        aria-label="Slide to save payroll batch"
+      />
+      <p className="text-center text-[11px] font-bold uppercase tracking-wide text-gold-dark">
+        {saving ? "Saving…" : "Slide right to save batch"}
+      </p>
+    </div>
+  );
+}
+
+function empIdLabel(employees: Employee[], id: number | "") {
+  if (id === "") return "—";
+  const e = employees.find((x) => String(x.id) === String(id));
+  return e?.id_number?.trim() ? e.id_number.trim() : "Not Assigned";
+}
+
 const emptyLine = (): PayrollLine => ({
   employee_id: "",
   foreman: "",
@@ -347,11 +381,12 @@ export function PayrollTab({
             ))}
           </datalist>
 
-          <div className="overflow-x-auto xl:overflow-x-visible">
+          <div className="hidden overflow-x-auto md:block xl:overflow-x-visible">
             <table className="w-full min-w-[1080px] text-xs">
               <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                 <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   <th className="px-3 py-2">Employee</th>
+                  <th className="px-2 py-2">Emp ID</th>
                   <th className="px-2 py-2">Foreman</th>
                   <th className="px-2 py-2 text-right">Hours</th>
                   <th className="px-2 py-2 text-right">Rate</th>
@@ -395,6 +430,9 @@ export function PayrollTab({
                             </p>
                           </div>
                         )}
+                      </td>
+                      <td className="whitespace-nowrap px-2 py-2 font-mono text-[11px] text-slate-600">
+                        {empIdLabel(employees, l.employee_id)}
                       </td>
                       <td className="px-2 py-2">
                         {foremanLine === idx ? (
@@ -493,7 +531,7 @@ export function PayrollTab({
               {totals && (
                 <tfoot>
                   <tr className="bg-navy-soft/70 font-bold text-navy">
-                    <td className="px-3 py-2" colSpan={4}>
+                    <td className="px-3 py-2" colSpan={5}>
                       Totals
                     </td>
                     <td className="px-2 py-2 text-right">{fmt(totals.gross)}</td>
@@ -507,6 +545,99 @@ export function PayrollTab({
               )}
             </table>
           </div>
+
+          {/* Mobile: one card per employee */}
+          <div className="space-y-3 p-3 md:hidden">
+            {draft.lines.map((l, idx) => (
+              <div key={idx} className="rounded-lg border border-border bg-card p-3 shadow-sm">
+                <div className="mb-2 flex items-start gap-2">
+                  <div className="flex-1">
+                    <EmployeeSearchSelect
+                      employees={employees}
+                      locked={locked}
+                      value={l.employee_id}
+                      onPick={(v) => pickEmployee(idx, v)}
+                    />
+                    <p className="mt-1 font-mono text-[10px] text-slate-500">
+                      ID {empIdLabel(employees, l.employee_id)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    title="Remove line"
+                    onClick={() =>
+                      setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== idx) })
+                    }
+                    className={btnIcon + " hover:border-danger hover:text-danger"}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+
+                <label className="mb-2 block">
+                  <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
+                    <HardHat size={12} className="text-gold-dark" /> Foreman
+                  </span>
+                  <input
+                    value={l.foreman}
+                    list="foreman-options"
+                    onChange={(e) => setLine(idx, { foreman: e.target.value })}
+                    placeholder={draft.foreman || "Foreman name"}
+                    className={inputSm}
+                  />
+                </label>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["hours", "Hours"],
+                      ["rate", "Rate"],
+                      ["food_deduction", "Food"],
+                      ["prev_advance", "Prev adv."],
+                      ["new_advance", "New adv."],
+                      ["other_deduction", "Other ded."],
+                      ["paid", "Paid"],
+                    ] as const
+                  ).map(([f, label]) => (
+                    <label key={f} className="block">
+                      <span className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                        {label}
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        value={l[f] as string}
+                        onChange={(e) => setLine(idx, { [f]: e.target.value })}
+                        className={inputSm + " text-right"}
+                      />
+                    </label>
+                  ))}
+                  <div className="self-end rounded-md bg-navy-soft px-2 py-1 text-right">
+                    <span className="block text-[10px] font-bold uppercase text-slate-500">Net</span>
+                    <span className="text-sm font-extrabold text-money">
+                      {fmt(toNum(l.net_salary))}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="mt-2 flex justify-between text-[11px] font-semibold text-slate-600">
+                  <span>Gross {fmt(lineGross(l))}</span>
+                  <span>Balance {fmt(toNum(l.net_salary) - toNum(l.paid))}</span>
+                </p>
+              </div>
+            ))}
+
+            {totals && (
+              <div className="rounded-lg bg-navy-soft/70 px-3 py-2 text-xs font-bold text-navy">
+                Totals — Gross {fmt(totals.gross)} · Net {fmt(totals.net)} · Paid{" "}
+                {fmt(totals.paid)} · Balance {fmt(totals.balance)}
+              </div>
+            )}
+
+            <SlideToSave onSave={save} saving={saving} />
+          </div>
+
 
           <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
             <button
