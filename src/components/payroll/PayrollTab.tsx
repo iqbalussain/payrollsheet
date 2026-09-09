@@ -154,6 +154,34 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 }
 
+function SlideToSave({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+  const [v, setV] = useState(0);
+  return (
+    <div className="sticky bottom-2 rounded-xl border border-gold/50 bg-gold/10 p-2">
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={v}
+        disabled={saving}
+        onChange={(e) => {
+          const n = Number(e.target.value);
+          if (n > 92) {
+            setV(0);
+            onSave();
+          } else setV(n);
+        }}
+        onPointerUp={() => setV(0)}
+        className="h-8 w-full cursor-grab accent-gold"
+        aria-label="Slide to save payroll batch"
+      />
+      <p className="text-center text-[11px] font-bold uppercase tracking-wide text-gold-dark">
+        {saving ? "Saving…" : "Slide right to save batch"}
+      </p>
+    </div>
+  );
+}
+
 function empIdLabel(employees: Employee[], id: number | "") {
   if (id === "") return "—";
   const e = employees.find((x) => String(x.id) === String(id));
