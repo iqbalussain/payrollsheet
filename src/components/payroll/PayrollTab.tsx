@@ -503,7 +503,7 @@ export function PayrollTab({
               {totals && (
                 <tfoot>
                   <tr className="bg-navy-soft/70 font-bold text-navy">
-                    <td className="px-3 py-2" colSpan={4}>
+                    <td className="px-3 py-2" colSpan={5}>
                       Totals
                     </td>
                     <td className="px-2 py-2 text-right">{fmt(totals.gross)}</td>
