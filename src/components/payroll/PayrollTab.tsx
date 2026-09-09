@@ -154,6 +154,12 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 }
 
+function empIdLabel(employees: Employee[], id: number | "") {
+  if (id === "") return "—";
+  const e = employees.find((x) => String(x.id) === String(id));
+  return e?.id_number?.trim() ? e.id_number.trim() : "Not Assigned";
+}
+
 const emptyLine = (): PayrollLine => ({
   employee_id: "",
   foreman: "",
