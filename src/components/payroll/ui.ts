@@ -1,11 +1,11 @@
 export const card =
-  "rounded-xl border border-border bg-card shadow-sm";
+  "app-card rounded-xl border border-border bg-card shadow-sm";
 
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-navy-dark disabled:cursor-not-allowed disabled:opacity-40";
+  "app-button inline-flex items-center justify-center gap-1.5 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-navy-dark disabled:cursor-not-allowed disabled:opacity-40";
 
 export const btnGold =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-gold-dark disabled:cursor-not-allowed disabled:opacity-40";
+  "app-button inline-flex items-center justify-center gap-1.5 rounded-lg bg-gold px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-colors hover:bg-gold-dark disabled:cursor-not-allowed disabled:opacity-40";
 
 export const btnOutline =
   "inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-card px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-40";
