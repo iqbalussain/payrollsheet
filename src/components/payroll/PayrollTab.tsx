@@ -117,7 +117,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   const list = (
     <div
       style={rect ? { top: rect.top, left: rect.left, width: rect.width } : undefined}
-      className="fixed z-[70] max-h-64 overflow-auto rounded-md border border-slate-200 bg-white shadow-xl"
+      className="employee-picker-sheet fixed z-[70] max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
     >
       {results.length === 0 ? (
             <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
@@ -139,7 +139,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                     setOpen(false);
                     setQuery("");
                   }}
-                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
+                   className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
                     selectableResults[highlightedIndex]?.id === e.id ? "bg-navy-soft" : ""
                   }`}
                   aria-selected={selectableResults[highlightedIndex]?.id === e.id}
@@ -227,7 +227,7 @@ function SlideToSave({ onSave, saving }: { onSave: () => void; saving: boolean }
           } else setV(n);
         }}
         onPointerUp={() => setV(0)}
-        className="h-8 w-full cursor-grab accent-gold"
+        className="h-9 w-full cursor-grab accent-teal"
         aria-label="Slide to save payroll batch"
       />
       <p className="text-center text-[11px] font-bold uppercase tracking-wide text-gold-dark">
@@ -366,7 +366,7 @@ export function PayrollTab({
 
   return (
     <div className="space-y-4">
-      <div className={card + " flex flex-col gap-3 p-4 sm:flex-row sm:items-center"}>
+      <div className={card + " mobile-toolbar flex flex-col gap-3 p-4 sm:flex-row sm:items-center"}>
         <div className="flex-1">
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Payroll month
@@ -398,7 +398,7 @@ export function PayrollTab({
 
       {draft && (
         <div className={card + " overflow-visible"}>
-          <div className="sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-t-xl border-b border-border bg-navy-soft px-4 py-3">
+          <div className="mobile-payroll-sticky sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-t-xl border-b border-border bg-navy-soft px-4 py-3">
             <div className="min-w-[160px] flex-1">
               <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
                 Site
@@ -604,7 +604,7 @@ export function PayrollTab({
           {/* Mobile: one card per employee */}
           <div className="space-y-3 p-3 md:hidden">
             {draft.lines.map((l, idx) => (
-              <div key={idx} className="rounded-lg border border-border bg-card p-3 shadow-sm">
+              <div key={idx} className="mobile-payroll-card rounded-lg border border-border bg-card p-3 shadow-sm">
                 <div className="mb-2 flex items-start gap-2">
                   <div className="flex-1">
                     <EmployeeSearchSelect
@@ -642,7 +642,7 @@ export function PayrollTab({
                   />
                 </label>
 
-                <div className="grid grid-cols-2 gap-2">
+                 <div className="grid grid-cols-2 gap-3">
                   {(
                     [
                       ["hours", "Hours"],
@@ -668,7 +668,7 @@ export function PayrollTab({
                       />
                     </label>
                   ))}
-                  <div className="self-end rounded-md bg-navy-soft px-2 py-1 text-right">
+                   <div className="self-end rounded-md bg-navy-soft px-3 py-2 text-right">
                     <span className="block text-[10px] font-bold uppercase text-slate-500">Net</span>
                     <span className="text-sm font-extrabold text-money">
                       {fmt(toNum(l.net_salary))}
@@ -721,7 +721,7 @@ export function PayrollTab({
           const net = b.lines.reduce((s, l) => s + toNum(l.net_salary), 0);
           const paid = b.lines.reduce((s, l) => s + toNum(l.paid), 0);
           return (
-            <div key={b.id} className={card + " flex flex-wrap items-center gap-3 p-4"}>
+            <div key={b.id} className={card + " mobile-batch-card flex flex-wrap items-center gap-3 p-4"}>
               <div className="flex-1">
                 <p className="text-sm font-bold text-navy">{b.site || "Unnamed site"}</p>
                 <p className="text-xs text-muted-foreground">

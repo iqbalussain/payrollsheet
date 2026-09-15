@@ -10,6 +10,10 @@ import {
   Users,
   Banknote,
   AlertTriangle,
+  Bell,
+  Home,
+  Plus,
+  ReceiptText,
 } from "lucide-react";
 
 import { EmployeesTab } from "@/components/payroll/EmployeesTab";
@@ -136,6 +140,22 @@ function Index() {
   };
 
   const error = employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error;
+  const tabTitle: Record<TabId, string> = {
+    employees: "Employees",
+    payroll: "Monthly Payroll",
+    advances: "Advances",
+    history: "Employee History",
+    slips: "Salary Slips",
+    cost: "Cost Allocation",
+  };
+  const mobileTabs: Array<{ id: TabId | "home"; label: string; icon: typeof Home }> = [
+    { id: "home", label: "Home", icon: Home },
+    { id: "employees", label: "Employees", icon: Users },
+    { id: "payroll", label: "Payroll", icon: Save },
+    { id: "advances", label: "Advances", icon: Banknote },
+    { id: "cost", label: "Costs", icon: BarChart2 },
+  ];
+  const showHome = tab === "history" || tab === "slips";
 
   return (
     <div className="mobile-app-shell min-h-screen bg-canvas font-sans text-foreground">
@@ -143,12 +163,17 @@ function Index() {
         <header className="mobile-app-header mb-5">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy shadow-sm max-sm:h-9 max-sm:w-9 max-sm:rounded-lg">
-              <HardHat size={20} className="text-white" />
+              <HardHat size={20} className="text-primary-foreground" />
             </div>
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy max-sm:text-lg">
               Site Payroll Manager
             </h1>
           </div>
+          <div className="mobile-header-copy">
+            <p>Site Payroll</p>
+            <strong>{showHome ? "Home" : tabTitle[tab]}</strong>
+          </div>
+          <button className="mobile-header-action" aria-label="Notifications"><Bell size={19} /></button>
           <p className="mt-1 text-sm text-muted-foreground max-sm:hidden">
             Add, review and update worker salary records — stored securely in the cloud database.
           </p>
@@ -161,7 +186,7 @@ function Index() {
               onClick={() => setTab(id)}
               className={`flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
                 tab === id
-                  ? "bg-navy text-white shadow-sm"
+                  ? "bg-navy text-primary-foreground shadow-sm"
                   : "text-slate-600 hover:bg-navy-soft hover:text-navy"
               }`}
             >
@@ -172,17 +197,19 @@ function Index() {
         </nav>
 
         <nav className="mobile-bottom-tabs" aria-label="Primary navigation">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {mobileTabs.map(({ id, label, icon: Icon }) => {
+            const active = id === "home" ? showHome : tab === id;
+            return (
             <button
               key={id}
-              onClick={() => setTab(id)}
-              aria-current={tab === id ? "page" : undefined}
-              className={`mobile-bottom-tab ${tab === id ? "is-active" : ""}`}
+              onClick={() => setTab(id === "home" ? "history" : id)}
+              aria-current={active ? "page" : undefined}
+              className={`mobile-bottom-tab ${active ? "is-active" : ""}`}
             >
-              <Icon size={19} strokeWidth={tab === id ? 2.5 : 2} />
-              <span>{label === "Monthly Payroll" ? "Payroll" : label === "Cost Allocation" ? "Costs" : label}</span>
+              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+              <span>{label}</span>
             </button>
-          ))}
+          )})}
         </nav>
 
         {error && (
@@ -191,6 +218,14 @@ function Index() {
           </p>
         )}
 
+        {showHome && (
+          <div className="mobile-home-switcher">
+            <button onClick={() => setTab("history")} className={tab === "history" ? "is-active" : ""}><History size={17} /> History</button>
+            <button onClick={() => setTab("slips")} className={tab === "slips" ? "is-active" : ""}><ReceiptText size={17} /> Salary slips</button>
+          </div>
+        )}
+
+        <main key={tab} className="mobile-screen-enter">
         {tab === "employees" && (
           <EmployeesTab
             employees={employees}
@@ -264,6 +299,11 @@ function Index() {
         {tab === "cost" && (
           <CostTab batches={batches} employees={employees} notify={notify} />
         )}
+        </main>
+
+        {tab === "employees" && (
+          <button onClick={() => { setForm(emptyForm); setMode("new"); }} className="mobile-fab" aria-label="New employee"><Plus size={24} /></button>
+        )}
       </div>
 
       <EmployeeModal
@@ -278,7 +318,7 @@ function Index() {
 
       {toast && (
         <div
-          className={`fixed bottom-5 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-lg ${
+          className={`fixed bottom-24 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg sm:bottom-5 ${
             toast.tone === "warn" ? "bg-danger" : "bg-money"
           }`}
         >
