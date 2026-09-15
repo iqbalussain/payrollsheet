@@ -41,6 +41,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   const [query, setQuery] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const boxRef = useRef<HTMLDivElement | null>(null);
+  const optionRefs = useRef(new Map<number, HTMLButtonElement>());
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const selected = employees.find((e) => String(e.id) === String(value));
 
@@ -84,6 +85,14 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
     setHighlightedIndex(0);
   }, [query]);
 
+  useEffect(() => {
+    if (!open) return;
+    const highlighted = selectableResults[highlightedIndex];
+    if (highlighted) {
+      optionRefs.current.get(highlighted.id)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [open, highlightedIndex, selectableResults]);
+
   if (selected && !open) {
     return (
       <div className="flex min-w-[190px] items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs">
@@ -119,6 +128,10 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                 <button
                   key={e.id}
                   type="button"
+                  ref={(element) => {
+                    if (element) optionRefs.current.set(e.id, element);
+                    else optionRefs.current.delete(e.id);
+                  }}
                   disabled={isLocked}
                   onMouseDown={(ev) => {
                     ev.preventDefault();

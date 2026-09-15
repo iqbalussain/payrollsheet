@@ -67,6 +67,16 @@ export function AdvancesTab({
     return m;
   }, [employees]);
 
+  const outstandingEmployeeIds = useMemo(
+    () =>
+      new Set(
+        employees
+          .filter((e) => advanceOutstanding(e.id, batches, advances) > 0)
+          .map((e) => String(e.id)),
+      ),
+    [employees, batches, advances],
+  );
+
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return advances
@@ -88,15 +98,6 @@ export function AdvancesTab({
   }, [advances, filterEmployee, query, empById, outstandingEmployeeIds]);
 
   const selected = filterEmployee ? empById.get(filterEmployee) ?? null : null;
-  const outstandingEmployeeIds = useMemo(
-    () =>
-      new Set(
-        employees
-          .filter((e) => advanceOutstanding(e.id, batches, advances) > 0)
-          .map((e) => String(e.id)),
-      ),
-    [employees, batches, advances],
-  );
 
   const totals = useMemo(() => {
     const issued = rows.reduce((s, a) => s + toNum(a.amount), 0);
@@ -173,7 +174,7 @@ export function AdvancesTab({
 
   return (
     <div className="space-y-4">
-      <div className={card + " flex flex-col gap-3 p-4 sm:flex-row sm:items-end"}>
+      <div className={card + " flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:p-4"}>
         <div className="flex-1">
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
             Employee
@@ -181,7 +182,7 @@ export function AdvancesTab({
           <select
             value={filterEmployee}
             onChange={(e) => setFilterEmployee(e.target.value)}
-            className={select + " sm:w-72"}
+            className={select + " w-full sm:w-72"}
           >
             <option value="">All employees</option>
             {employees.map((e) => (
@@ -213,19 +214,19 @@ export function AdvancesTab({
             setForm({ ...emptyForm(), employee_id: filterEmployee });
             setOpen(true);
           }}
-          className={btnGold}
+          className={btnGold + " w-full justify-center sm:w-auto"}
         >
           <Plus size={16} /> New advance
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { label: "Advances listed", value: fmt(totals.issued) },
           { label: selected ? "Recovered via payroll" : "Transactions", value: selected ? fmt(totals.recovered) : String(rows.length) },
           { label: "Outstanding balance", value: fmt(totals.outstanding) },
         ].map((s) => (
-          <div key={s.label} className={card + " p-3.5"}>
+          <div key={s.label} className={card + " p-3"}>
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {s.label}
             </p>
@@ -345,7 +346,61 @@ export function AdvancesTab({
       )}
 
       <div className={card + " overflow-hidden"}>
-        <div className="overflow-x-auto">
+        <div className="space-y-2 p-3 sm:hidden">
+          {rows.length === 0 ? (
+            <p className="px-1 py-6 text-center text-sm text-slate-400">
+              No advance transactions yet.
+            </p>
+          ) : (
+            rows.map((a) => {
+              const emp = empById.get(String(a.employee_id));
+              return (
+                <div key={a.id} className="rounded-lg border border-border bg-card p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-navy">{emp?.name ?? `#${a.employee_id}`}</p>
+                      <p className="text-[11px] text-slate-500">{a.date} · {a.reason || "No reason"}</p>
+                    </div>
+                    <p className="font-bold text-warn">{fmt(toNum(a.amount))} OMR</p>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-xs">
+                    <span className="text-slate-500">
+                      Outstanding: <strong className="text-navy">{fmt(advanceOutstanding(a.employee_id, batches, advances))}</strong>
+                    </span>
+                    <div className="flex gap-1.5">
+                      <button
+                        title="Edit"
+                        onClick={() => {
+                          setForm({
+                            id: a.id,
+                            employee_id: String(a.employee_id),
+                            date: a.date,
+                            amount: String(a.amount),
+                            reason: a.reason || ADVANCE_REASONS[0]!,
+                            payment_method: a.payment_method || "Cash",
+                            notes: a.notes,
+                          });
+                          setOpen(true);
+                        }}
+                        className={btnIcon}
+                      >
+                        <Save size={14} />
+                      </button>
+                      <button
+                        title="Delete"
+                        onClick={() => onDelete(a.id)}
+                        className={btnIcon + " hover:border-danger hover:text-danger"}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[820px] text-xs">
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
