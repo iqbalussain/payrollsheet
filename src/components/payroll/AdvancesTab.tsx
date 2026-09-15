@@ -98,6 +98,17 @@ export function AdvancesTab({
   }, [advances, filterEmployee, query, empById, outstandingEmployeeIds]);
 
   const selected = filterEmployee ? empById.get(filterEmployee) ?? null : null;
+  const outstandingEmployees = useMemo(
+    () =>
+      employees
+        .map((employee) => ({
+          employee,
+          balance: advanceOutstanding(employee.id, batches, advances),
+        }))
+        .filter(({ balance }) => balance > 0)
+        .sort((a, b) => a.employee.name.localeCompare(b.employee.name)),
+    [employees, batches, advances],
+  );
 
   const totals = useMemo(() => {
     const issued = rows.reduce((s, a) => s + toNum(a.amount), 0);
@@ -477,6 +488,47 @@ export function AdvancesTab({
           </table>
         </div>
       </div>
+
+      {!selected && outstandingEmployees.length > 0 && (
+        <div className={card + " overflow-hidden"}>
+          <div className="border-b border-border bg-navy-soft/60 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-navy">
+            Outstanding balances by employee
+          </div>
+          <div className="divide-y divide-border sm:hidden">
+            {outstandingEmployees.map(({ employee, balance }) => (
+              <div key={employee.id} className="flex items-center justify-between gap-3 px-3 py-3">
+                <div>
+                  <p className="font-semibold text-navy">{employee.name}</p>
+                  <p className="text-[11px] text-slate-500">{employee.trade}</p>
+                </div>
+                <p className="font-bold text-money">{fmt(balance)} OMR</p>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-2.5">Employee</th>
+                  <th className="px-4 py-2.5">Trade</th>
+                  <th className="px-4 py-2.5 text-right">Outstanding balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {outstandingEmployees.map(({ employee, balance }) => (
+                  <tr key={employee.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-2.5 font-semibold text-navy">{employee.name}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{employee.trade}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-money">
+                      {fmt(balance)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {selected && monthly.length > 0 && (
         <div className={card + " overflow-hidden"}>
