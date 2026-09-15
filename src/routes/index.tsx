@@ -138,23 +138,23 @@ function Index() {
   const error = employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error;
 
   return (
-    <div className="min-h-screen bg-canvas font-sans text-foreground">
+    <div className="mobile-app-shell min-h-screen bg-canvas font-sans text-foreground">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <header className="mb-5">
+        <header className="mobile-app-header mb-5">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy shadow-sm max-sm:h-9 max-sm:w-9 max-sm:rounded-lg">
               <HardHat size={20} className="text-white" />
             </div>
-            <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy">
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-navy max-sm:text-lg">
               Site Payroll Manager
             </h1>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground max-sm:hidden">
             Add, review and update worker salary records — stored securely in the cloud database.
           </p>
         </header>
 
-        <nav className="mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
+        <nav className="mobile-desktop-tabs mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -167,6 +167,20 @@ function Index() {
             >
               <Icon size={14} />
               {label}
+            </button>
+          ))}
+        </nav>
+
+        <nav className="mobile-bottom-tabs" aria-label="Primary navigation">
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              aria-current={tab === id ? "page" : undefined}
+              className={`mobile-bottom-tab ${tab === id ? "is-active" : ""}`}
+            >
+              <Icon size={19} strokeWidth={tab === id ? 2.5 : 2} />
+              <span>{label === "Monthly Payroll" ? "Payroll" : label === "Cost Allocation" ? "Costs" : label}</span>
             </button>
           ))}
         </nav>
