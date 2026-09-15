@@ -185,7 +185,7 @@ export function AdvancesTab({
 
   return (
     <div className="space-y-4">
-      <div className={card + " flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:p-4"}>
+      <div className={card + " mobile-toolbar flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:p-4"}>
         <div className="flex-1">
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
             Employee
@@ -231,13 +231,13 @@ export function AdvancesTab({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mobile-metric-grid grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
           { label: "Advances listed", value: fmt(totals.issued) },
           { label: selected ? "Recovered via payroll" : "Transactions", value: selected ? fmt(totals.recovered) : String(rows.length) },
           { label: "Outstanding balance", value: fmt(totals.outstanding) },
         ].map((s) => (
-          <div key={s.label} className={card + " p-3"}>
+          <div key={s.label} className={`${card} p-3 ${s.label === "Outstanding balance" ? "mobile-metric-alert col-span-2 sm:col-span-1" : ""}`}>
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {s.label}
             </p>
@@ -247,7 +247,7 @@ export function AdvancesTab({
       </div>
 
       {open && (
-        <div className={card + " p-4"}>
+        <div className={card + " mobile-form-sheet p-4"}>
           <div className="mb-3 flex items-center gap-2">
             <Banknote size={16} className="text-gold-dark" />
             <h2 className="text-sm font-bold text-navy">
@@ -356,7 +356,7 @@ export function AdvancesTab({
         </div>
       )}
 
-      <div className={card + " overflow-hidden"}>
+      <div className="sm:rounded-xl sm:border sm:border-border sm:bg-card sm:shadow-sm">
         <div className="space-y-2 p-3 sm:hidden">
           {rows.length === 0 ? (
             <p className="px-1 py-6 text-center text-sm text-slate-400">
@@ -366,7 +366,7 @@ export function AdvancesTab({
             rows.map((a) => {
               const emp = empById.get(String(a.employee_id));
               return (
-                <div key={a.id} className="rounded-lg border border-border bg-card p-3">
+                 <div key={a.id} className="mobile-list-card block rounded-lg border border-border bg-card p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-navy">{emp?.name ?? `#${a.employee_id}`}</p>

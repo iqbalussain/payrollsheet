@@ -56,10 +56,10 @@ export function EmployeeModal({
   const ro = readOnly ? " bg-navy-soft/60 text-slate-600" : "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4">
+    <div className="mobile-modal fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4">
       <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div
-        className={`relative my-6 w-full rounded-2xl bg-card shadow-2xl ${readOnly ? "max-w-5xl" : "max-w-md"}`}
+        className={`mobile-sheet relative my-6 w-full rounded-2xl bg-card shadow-2xl ${readOnly ? "max-w-5xl" : "max-w-md"}`}
       >
         <div className="flex items-center justify-between rounded-t-2xl border-b border-border px-6 py-4">
           <div>
