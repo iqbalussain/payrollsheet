@@ -27,9 +27,20 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
   const filtered = useMemo(
     () =>
       employees
+        .slice()
+        .sort((a, b) => a.id - b.id)
         .filter((e) => tradeFilter === "ALL" || e.trade === tradeFilter)
         .filter((e) => statusFilter === "ALL" || e.status === statusFilter)
-        .filter((e) => e.name.toLowerCase().includes(search.toLowerCase())),
+        .filter((e) => {
+          const q = search.trim().toLowerCase();
+          return (
+            !q ||
+            e.name.toLowerCase().includes(q) ||
+            String(e.id_number ?? "")
+              .toLowerCase()
+              .includes(q)
+          );
+        }),
     [employees, search, tradeFilter, statusFilter],
   );
 
@@ -80,7 +91,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name…"
+            placeholder="Search by name or ID…"
             className={input + " pl-9"}
           />
         </div>
@@ -111,6 +122,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
           <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                <th className="px-4 py-3">S.No</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Trade</th>
                 <th className="px-4 py-3">ID number</th>
@@ -122,19 +134,20 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     Loading…
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                     No employees match this search.
                   </td>
                 </tr>
               ) : (
                 filtered.map((e) => (
                   <tr key={e.id} className="border-b border-border last:border-0 hover:bg-navy-soft/50">
+                    <td className="px-4 py-2.5 text-slate-500">{e.id}</td>
                     <td className="px-4 py-2.5 font-medium text-foreground">{e.name}</td>
                     <td className="px-4 py-2.5 text-slate-600">{e.trade}</td>
                     <td className="px-4 py-2.5 font-mono text-xs text-slate-500">

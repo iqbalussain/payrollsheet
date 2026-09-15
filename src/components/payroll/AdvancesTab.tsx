@@ -70,7 +70,11 @@ export function AdvancesTab({
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return advances
-      .filter((a) => (filterEmployee ? String(a.employee_id) === filterEmployee : true))
+      .filter((a) =>
+        filterEmployee
+          ? String(a.employee_id) === filterEmployee
+          : outstandingEmployeeIds.has(String(a.employee_id)),
+      )
       .filter((a) => {
         if (!q) return true;
         const name = empById.get(String(a.employee_id))?.name ?? "";
@@ -81,9 +85,18 @@ export function AdvancesTab({
         );
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [advances, filterEmployee, query, empById]);
+  }, [advances, filterEmployee, query, empById, outstandingEmployeeIds]);
 
   const selected = filterEmployee ? empById.get(filterEmployee) ?? null : null;
+  const outstandingEmployeeIds = useMemo(
+    () =>
+      new Set(
+        employees
+          .filter((e) => advanceOutstanding(e.id, batches, advances) > 0)
+          .map((e) => String(e.id)),
+      ),
+    [employees, batches, advances],
+  );
 
   const totals = useMemo(() => {
     const issued = rows.reduce((s, a) => s + toNum(a.amount), 0);

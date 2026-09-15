@@ -20,7 +20,12 @@ export function CostTab({ batches, employees, notify }: Props) {
   const costRows = useMemo(() => {
     const buckets: Record<
       string,
-      { label: string; workers: Set<string>; hours: number; gross: number; food: number; net: number }
+      {
+        label: string;
+        workers: Set<string>;
+        net: number;
+        paid: number;
+      }
     > = {};
     batches
       .filter((b) => !filterMonth || b.month === filterMonth)
@@ -37,22 +42,18 @@ export function CostTab({ batches, employees, notify }: Props) {
           buckets[key] ??= {
             label: key,
             workers: new Set(),
-            hours: 0,
-            gross: 0,
-            food: 0,
             net: 0,
+            paid: 0,
           };
           const bucket = buckets[key];
           bucket.workers.add(String(l.employee_id));
-          bucket.hours += toNum(l.hours);
-          bucket.gross += toNum(l.hours) * toNum(l.rate);
-          bucket.food += toNum(l.food_deduction);
           bucket.net += toNum(l.net_salary);
+          bucket.paid += toNum(l.paid);
         });
       });
     return Object.values(buckets)
       .map((b) => ({ ...b, workers: b.workers.size }))
-      .sort((a, b) => b.gross - a.gross);
+      .sort((a, b) => b.net - a.net);
   }, [batches, filterMonth, groupBy]);
 
   const grand = useMemo(() => {
@@ -62,9 +63,8 @@ export function CostTab({ batches, employees, notify }: Props) {
       .forEach((b) => b.lines.forEach((l) => l.employee_id && workers.add(String(l.employee_id))));
     return {
       workers: workers.size,
-      hours: costRows.reduce((s, r) => s + r.hours, 0),
-      gross: costRows.reduce((s, r) => s + r.gross, 0),
       net: costRows.reduce((s, r) => s + r.net, 0),
+      paid: costRows.reduce((s, r) => s + r.paid, 0),
     };
   }, [batches, costRows, filterMonth]);
 
@@ -122,11 +122,11 @@ export function CostTab({ batches, employees, notify }: Props) {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
+        {        [
           { label: "Unique workers", value: String(grand.workers) },
-          { label: "Total hours", value: fmt(grand.hours) },
-          { label: "Total gross (OMR)", value: fmt(grand.gross) },
           { label: "Total net salary (OMR)", value: fmt(grand.net), money: true },
+          { label: "Total paid (OMR)", value: fmt(grand.paid), money: true },
+          { label: "Total remaining (OMR)", value: fmt(grand.net - grand.paid), money: true },
         ].map((s) => (
           <div key={s.label} className={card + " p-3.5"}>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -145,26 +145,23 @@ export function CostTab({ batches, employees, notify }: Props) {
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-4 py-3">
-                  {groupBy === "site" ? "Site" : groupBy === "foreman" ? "Foreman" : "Site / Foreman"}
+                  Site
                 </th>
                 <th className="px-4 py-3 text-right">Workers</th>
-                <th className="px-4 py-3 text-right">Hours</th>
-                <th className="px-4 py-3 text-right">Gross (OMR)</th>
-                <th className="px-4 py-3 text-right">Food ded.</th>
                 <th className="px-4 py-3 text-right">Net salary (OMR)</th>
-                <th className="w-36 px-4 py-3">% of total</th>
+                <th className="px-4 py-3 text-right">Paid</th>
+                <th className="px-4 py-3 text-right">Remaining</th>
               </tr>
             </thead>
             <tbody>
               {costRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                     No payroll data for the selected period.
                   </td>
                 </tr>
               ) : (
                 costRows.map((r) => {
-                  const pct = grand.gross > 0 ? (r.gross / grand.gross) * 100 : 0;
                   return (
                     <tr
                       key={r.label}
@@ -172,24 +169,10 @@ export function CostTab({ batches, employees, notify }: Props) {
                     >
                       <td className="px-4 py-2.5 font-medium text-foreground">{r.label}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{r.workers}</td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.hours)}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold text-navy">
-                        {fmt(r.gross)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-danger">{fmt(r.food)}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-money">{fmt(r.net)}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 flex-1 rounded-full bg-navy-soft">
-                            <div
-                              className="h-2 rounded-full bg-navy"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className="w-8 text-right text-xs text-slate-500">
-                            {pct.toFixed(0)}%
-                          </span>
-                        </div>
+                      <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.paid)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-navy">
+                        {fmt(r.net - r.paid)}
                       </td>
                     </tr>
                   );
@@ -201,11 +184,9 @@ export function CostTab({ batches, employees, notify }: Props) {
                 <tr className="border-t-2 border-slate-300 bg-navy-soft/70 font-bold text-navy">
                   <td className="px-4 py-2.5">TOTAL</td>
                   <td className="px-4 py-2.5 text-right">{grand.workers}</td>
-                  <td className="px-4 py-2.5 text-right">{fmt(grand.hours)}</td>
-                  <td className="px-4 py-2.5 text-right">{fmt(grand.gross)}</td>
-                  <td />
                   <td className="px-4 py-2.5 text-right text-money">{fmt(grand.net)}</td>
-                  <td className="px-4 py-2.5 text-center text-xs text-slate-400">100%</td>
+                  <td className="px-4 py-2.5 text-right">{fmt(grand.paid)}</td>
+                  <td className="px-4 py-2.5 text-right">{fmt(grand.net - grand.paid)}</td>
                 </tr>
               </tfoot>
             )}

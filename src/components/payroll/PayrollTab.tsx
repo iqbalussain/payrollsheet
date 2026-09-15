@@ -39,6 +39,7 @@ interface EmployeeSearchProps {
 function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const selected = employees.find((e) => String(e.id) === String(value));
@@ -67,10 +68,21 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
           !q ||
           e.name.toLowerCase().includes(q) ||
           e.trade.toLowerCase().includes(q) ||
+          String(e.id_number ?? "")
+            .toLowerCase()
+            .includes(q) ||
           String(e.id).includes(q),
       )
       .slice(0, 40);
   }, [employees, query]);
+  const selectableResults = useMemo(
+    () => results.filter((e) => !locked.has(String(e.id))),
+    [results, locked],
+  );
+
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [query]);
 
   if (selected && !open) {
     return (
@@ -114,7 +126,10 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                     setOpen(false);
                     setQuery("");
                   }}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45"
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[11px] hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
+                    selectableResults[highlightedIndex]?.id === e.id ? "bg-navy-soft" : ""
+                  }`}
+                  aria-selected={selectableResults[highlightedIndex]?.id === e.id}
                 >
                   <span className="font-semibold text-navy">
                     {e.name} <span className="font-normal text-slate-400">— {e.trade}</span>
@@ -146,6 +161,33 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setHighlightedIndex((index) =>
+              selectableResults.length ? (index + 1) % selectableResults.length : 0,
+            );
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setOpen(true);
+            setHighlightedIndex((index) =>
+              selectableResults.length
+                ? (index - 1 + selectableResults.length) % selectableResults.length
+                : 0,
+            );
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const employee = selectableResults[highlightedIndex];
+            if (employee) {
+              onPick(String(employee.id));
+              setOpen(false);
+              setQuery("");
+            }
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
         placeholder="Search name, trade or ID…"
         className={inputSm + " w-full pl-7"}
       />
