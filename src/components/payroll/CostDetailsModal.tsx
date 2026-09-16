@@ -20,7 +20,7 @@ interface Props {
   batches: PayrollBatch[];
   employees: Employee[];
   month?: string;
-  notify?: (msg: string, tone?: "ok" | "warn") => void;
+  notify?: ((msg: string, tone?: "ok" | "warn") => void) | undefined;
 }
 
 export function CostDetailsModal({
