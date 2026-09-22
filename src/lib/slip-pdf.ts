@@ -31,6 +31,17 @@ function money(value: number) {
   return `${fmt(value)} OMR`;
 }
 
+function fitFontSize(doc: jsPDF, text: string, maxWidth: number, preferred: number, minimum = 6) {
+  let size = preferred;
+  while (size > minimum) {
+    doc.setFontSize(size);
+    if (doc.getTextWidth(text) <= maxWidth) return size;
+    size -= 0.25;
+  }
+  doc.setFontSize(minimum);
+  return minimum;
+}
+
 function drawLogo(doc: jsPDF, x: number, y: number) {
   doc.setDrawColor(...GOLD);
   doc.setLineWidth(1.8);
@@ -58,13 +69,16 @@ function drawLabelValue(
   y: number,
   width: number,
 ) {
+  const cellRight = x + width;
+  const labelMaxWidth = width * 0.46;
+  const valueMaxWidth = width * 0.48;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  fitFontSize(doc, label, labelMaxWidth, 8.5, 6.25);
   doc.setTextColor(...INK);
   doc.text(label, x, y);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(value || "—", x + width, y, { align: "right" });
+  fitFontSize(doc, value || "—", valueMaxWidth, 9, 6.25);
+  doc.text(value || "—", cellRight, y, { align: "right" });
 }
 
 function drawCard(
@@ -88,22 +102,27 @@ function drawCard(
   doc.rect(x, y + 7, width, 5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  fitFontSize(doc, title, width - 8, 11, 8);
   doc.text(title, x + width / 2, y + 8, { align: "center" });
 
   let rowY = y + 23;
   rows.forEach(({ label, value, emphasis }) => {
+    const innerLeft = x + 3;
+    const innerRight = x + width - 3;
+    const valueWidth = Math.min(31, Math.max(25, doc.getTextWidth(value) + 6));
+    const labelWidth = innerRight - innerLeft - valueWidth - 2;
+    const valueX = innerRight;
     doc.setFont("helvetica", emphasis ? "bold" : "normal");
-    doc.setFontSize(8.5);
+    fitFontSize(doc, label, labelWidth, 8.5, 6.25);
     doc.setTextColor(...INK);
-    doc.text(label, x + 3, rowY);
+    doc.text(label, innerLeft, rowY);
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...color);
-    doc.roundedRect(x + width - 29, rowY - 5.1, 26, 7, 1.5, 1.5, "FD");
+    doc.roundedRect(valueX - valueWidth, rowY - 5.1, valueWidth, 7, 1.5, 1.5, "FD");
     doc.setFont("helvetica", emphasis ? "bold" : "normal");
-    doc.setFontSize(8);
+    fitFontSize(doc, value, valueWidth - 5, 8, 6.25);
     doc.setTextColor(...INK);
-    doc.text(value, x + width - 4, rowY, { align: "right" });
+    doc.text(value, valueX - 2, rowY, { align: "right" });
     rowY += 12;
   });
 
@@ -111,14 +130,23 @@ function drawCard(
   doc.roundedRect(x + 2.5, y + height - 11, width - 5, 8, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  fitFontSize(doc, total.label, width - 34, 8.5, 6.25);
   doc.text(total.label, x + 5, y + height - 5.5);
+  const totalValueWidth = Math.min(29, Math.max(25, doc.getTextWidth(total.value) + 6));
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...color);
-  doc.roundedRect(x + width - 28, y + height - 10.5, 25, 7, 1.2, 1.2, "FD");
+  doc.roundedRect(
+    x + width - totalValueWidth - 2.5,
+    y + height - 10.5,
+    totalValueWidth,
+    7,
+    1.2,
+    1.2,
+    "FD",
+  );
   doc.setTextColor(...INK);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  fitFontSize(doc, total.value, totalValueWidth - 5, 8, 6.25);
   doc.text(total.value, x + width - 5, y + height - 5.5, { align: "right" });
 }
 
@@ -142,7 +170,7 @@ function drawSlip(doc: jsPDF, slip: SlipInput) {
   drawLogo(doc, left, 10);
   doc.setTextColor(...INK);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
+  fitFontSize(doc, "Modern Investment & Trading Company SPC", 143, 15, 10);
   doc.text("Modern Investment & Trading Company SPC", 52, 15);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
@@ -164,7 +192,7 @@ function drawSlip(doc: jsPDF, slip: SlipInput) {
 
   const tableY = 61;
   const rowHeight = 10;
-  const columns = [left, 51, 113, 151, left + contentWidth];
+  const columns = [left, 66, 113, 158, left + contentWidth];
   const staffRows: Array<[string, string, string, string]> = [
     ["NAME EMPLOYEE:", e.name, "TRADE:", e.trade],
     ["EMP ID NO:", e.id_number || "—", "SALARY MONTH:", monthLabel(month)],
@@ -178,8 +206,22 @@ function drawSlip(doc: jsPDF, slip: SlipInput) {
     doc.line(columns[1]!, y, columns[1]!, y + rowHeight);
     doc.line(columns[2]!, y, columns[2]!, y + rowHeight);
     doc.line(columns[3]!, y, columns[3]!, y + rowHeight);
-    drawLabelValue(doc, values[0], values[1], columns[0]! + 3, y + 6.5, 34);
-    drawLabelValue(doc, values[2], values[3], columns[2]! + 3, y + 6.5, 34);
+    drawLabelValue(
+      doc,
+      values[0],
+      values[1],
+      columns[0]! + 3,
+      y + 6.5,
+      columns[1]! - columns[0]! - 6,
+    );
+    drawLabelValue(
+      doc,
+      values[2],
+      values[3],
+      columns[2]! + 3,
+      y + 6.5,
+      columns[3]! - columns[2]! - 6,
+    );
   });
 
   const cardY = 99;
