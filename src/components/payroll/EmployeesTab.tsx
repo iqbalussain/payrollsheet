@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Eye, Pencil, Plus, Search, Users } from "lucide-react";
+import { ChevronRight, Eye, Pencil, Plus, Search, Users } from "lucide-react";
 import { TRADES, fmt, type Employee, type PayrollBatch } from "@/lib/payroll";
 import { btnGold, btnIcon, btnOutline, card, input, select } from "./ui";
 
@@ -45,10 +45,19 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
   );
 
   const selected = employees.find((e) => String(e.id) === selectedId) || null;
+  const activeCount = employees.filter((e) => e.status === "Active").length;
 
   return (
     <div className="space-y-4">
-      <div className={card + " flex flex-col gap-3 p-4 sm:flex-row sm:items-center"}>
+      <div className="grid grid-cols-2 gap-3 sm:hidden">
+        <div className="mobile-metric mobile-metric-primary">
+          <p>Active staff</p><strong>{activeCount}</strong>
+        </div>
+        <div className="mobile-metric">
+          <p>Total employees</p><strong>{employees.length}</strong>
+        </div>
+      </div>
+      <div className={card + " hidden flex-col gap-3 p-4 sm:flex sm:flex-row sm:items-center"}>
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <select
             value={selectedId}
@@ -82,7 +91,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="mobile-filter-bar flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search
             size={15}
@@ -98,6 +107,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
         <select
           value={tradeFilter}
           onChange={(e) => setTradeFilter(e.target.value)}
+          aria-label="Filter by trade"
           className={select + " sm:w-44"}
         >
           <option value="ALL">All trades</option>
@@ -108,6 +118,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
           className={select + " sm:w-40"}
         >
           <option value="ALL">All statuses</option>
@@ -117,7 +128,29 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
         </select>
       </div>
 
-      <div className={card + " overflow-hidden"}>
+      <div className="space-y-3 sm:hidden">
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => <div key={i} className="mobile-list-skeleton" />)
+        ) : filtered.length === 0 ? (
+          <div className={card + " p-8 text-center text-sm text-muted-foreground"}>No employees match this search.</div>
+        ) : filtered.map((employee) => (
+          <article key={employee.id} className="mobile-list-card" onClick={() => onView(employee)}>
+            <div className="mobile-avatar" aria-hidden="true">{employee.name.split(" ").slice(0, 2).map((part) => part[0]).join("")}</div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-sm font-bold text-foreground">{employee.name}</h2>
+                <span className={`status-pill ${statusStyle[employee.status]}`}>{employee.status}</span>
+              </div>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{employee.trade} · ID {employee.id_number || "Not assigned"}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Salary / hr <strong className="text-foreground">{fmt(employee.hourly_rate)} OMR</strong></p>
+            </div>
+            <button aria-label={`Edit ${employee.name}`} onClick={(event) => { event.stopPropagation(); onEdit(employee); }} className={btnIcon}><Pencil size={16} /></button>
+            <ChevronRight size={18} className="shrink-0 text-muted-foreground" />
+          </article>
+        ))}
+      </div>
+
+      <div className={card + " hidden overflow-hidden sm:block"}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
