@@ -10,6 +10,7 @@ import {
 } from "./payroll";
 
 type RGB = [number, number, number];
+type HeaderImage = string;
 
 const INK: RGB = [24, 29, 35];
 const MUTED: RGB = [91, 100, 110];
@@ -17,7 +18,6 @@ const BORDER: RGB = [190, 197, 203];
 const GREEN: RGB = [54, 157, 117];
 const RED: RGB = [204, 69, 70];
 const BLUE: RGB = [52, 111, 170];
-const GOLD: RGB = [171, 124, 38];
 
 export interface SlipInput {
   employee: Employee;
@@ -42,23 +42,34 @@ function fitFontSize(doc: jsPDF, text: string, maxWidth: number, preferred: numb
   return minimum;
 }
 
-function drawLogo(doc: jsPDF, x: number, y: number) {
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(1.8);
-  doc.line(x + 3, y + 22, x + 3, y + 7);
-  doc.line(x + 3, y + 22, x + 29, y + 22);
-  doc.line(x + 8, y + 18, x + 8, y + 11);
-  doc.line(x + 15, y + 18, x + 15, y + 6);
-  doc.line(x + 22, y + 18, x + 22, y + 2);
-  doc.setLineWidth(2.2);
-  doc.line(x + 4, y + 14, x + 13, y + 19);
-  doc.line(x + 13, y + 19, x + 28, y + 5);
-  doc.setFillColor(...GOLD);
-  doc.triangle(x + 28, y + 5, x + 23.5, y + 6.5, x + 27, y + 10, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(80, 64, 39);
-  doc.text("MITC", x, y + 31);
+let headerImagePromise: Promise<HeaderImage> | undefined;
+
+function loadHeaderImage() {
+  if (!headerImagePromise) {
+    headerImagePromise = fetch("/Salary Header.png")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Unable to load salary slip header (${response.status}).`);
+        }
+        return response.blob();
+      })
+      .then(
+        (blob) =>
+          new Promise<HeaderImage>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result !== "string") {
+                reject(new Error("Salary slip header could not be read."));
+                return;
+              }
+              resolve(reader.result);
+            };
+            reader.onerror = () => reject(new Error("Salary slip header could not be read."));
+            reader.readAsDataURL(blob);
+          }),
+      );
+  }
+  return headerImagePromise;
 }
 
 function drawLabelValue(
@@ -150,7 +161,7 @@ function drawCard(
   doc.text(total.value, x + width - 5, y + height - 5.5, { align: "right" });
 }
 
-function drawSlip(doc: jsPDF, slip: SlipInput) {
+function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
   const { employee: e, month, row } = slip;
   const pageWidth = 210;
   const left = 15;
@@ -167,23 +178,11 @@ function drawSlip(doc: jsPDF, slip: SlipInput) {
   doc.setFillColor(252, 253, 254);
   doc.rect(0, 0, pageWidth, 297, "F");
 
-  drawLogo(doc, left, 10);
-  doc.setTextColor(...INK);
-  doc.setFont("helvetica", "bold");
-  fitFontSize(doc, "Modern Investment & Trading Company SPC", 143, 15, 10);
-  doc.text("Modern Investment & Trading Company SPC", 52, 15);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.addImage(headerImage, "PNG", left, 8, contentWidth, 31);
   doc.setTextColor(...MUTED);
-  doc.text("Hamriyah, Muscat 112,", 52, 21);
-  doc.text("Phone: +968 97260309, Email: mitcoman@zohomail.com", 52, 26);
-  doc.setTextColor(...INK);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(19);
-  doc.text("SALARY SLIP", pageWidth / 2, 40, { align: "center" });
   doc.setFontSize(9);
-  doc.setTextColor(...MUTED);
-  doc.text(monthLabel(month).toUpperCase(), pageWidth / 2, 46, { align: "center" });
+  doc.text(monthLabel(month).toUpperCase(), pageWidth / 2, 44, { align: "center" });
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -306,12 +305,13 @@ function drawSlip(doc: jsPDF, slip: SlipInput) {
   );
 }
 
-export function downloadSlips(slips: SlipInput[]) {
+export async function downloadSlips(slips: SlipInput[]) {
   if (!slips.length) return;
+  const headerImage = await loadHeaderImage();
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   slips.forEach((slip, i) => {
     if (i > 0) doc.addPage();
-    drawSlip(doc, slip);
+    drawSlip(doc, slip, headerImage);
   });
   const name =
     slips.length === 1

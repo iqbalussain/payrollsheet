@@ -26,10 +26,7 @@ export function SlipsTab({ employees, batches, notify }: Props) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
-  const empById = useMemo(
-    () => new Map(employees.map((e) => [e.id, e])),
-    [employees],
-  );
+  const empById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
   const rows = useMemo(() => {
     const out: Array<{ employee: Employee; row: ReturnType<typeof employeeRows>[number] }> = [];
@@ -61,14 +58,15 @@ export function SlipsTab({ employees, batches, notify }: Props) {
   const toggle = (id: number) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.employee.id)));
 
-  const download = () => {
+  const download = async () => {
     const picked = rows.filter((r) => selected.has(r.employee.id));
     if (!picked.length) {
       notify("Select at least one employee to generate slips.", "warn");
@@ -81,8 +79,13 @@ export function SlipsTab({ employees, batches, notify }: Props) {
       carriedForward: getCarryForward(employee.id, month, batches),
       outstandingAdvance: outstandingAdvance(employee.id, batches),
     }));
-    downloadSlips(slips);
-    notify(`${slips.length} salary slip(s) downloaded.`);
+    try {
+      await downloadSlips(slips);
+      notify(`${slips.length} salary slip(s) downloaded.`);
+    } catch (error) {
+      console.error("Unable to generate salary slips.", error);
+      notify("Unable to generate salary slips. Please try again.", "warn");
+    }
   };
 
   return (
