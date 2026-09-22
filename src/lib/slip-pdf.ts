@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import JSZip from "jszip";
 import {
   fmt,
   lineBalance,
@@ -305,17 +306,74 @@ function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
   );
 }
 
-export async function downloadSlips(slips: SlipInput[]) {
+export function sanitizeFilename(value: string) {
+  const sanitized = value
+    .replace(/[/\\:*?"<>|]/g, "-")
+    .trim()
+    .replace(/[. ]+$/g, "");
+  return sanitized || "salary-slip";
+}
+
+function slipFilename(slip: SlipInput) {
+  return `${sanitizeFilename(`${slip.employee.name} - ${slip.employee.trade}`)}.pdf`;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+export async function generateSalarySlipPDF(slip: SlipInput, headerImage?: HeaderImage) {
+  const resolvedHeaderImage = headerImage ?? (await loadHeaderImage());
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  drawSlip(doc, slip, resolvedHeaderImage);
+  return doc.output("blob");
+}
+
+interface DownloadSlipsOptions {
+  onProgress?: (completed: number, total: number) => void;
+}
+
+export async function downloadSlips(slips: SlipInput[], options: DownloadSlipsOptions = {}) {
   if (!slips.length) return;
   const headerImage = await loadHeaderImage();
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  slips.forEach((slip, i) => {
-    if (i > 0) doc.addPage();
-    drawSlip(doc, slip, headerImage);
-  });
-  const name =
-    slips.length === 1
-      ? `salary-slip-${slips[0]!.employee.name.replace(/\s+/g, "-")}-${slips[0]!.month}.pdf`
-      : `salary-slips-${slips[0]!.month}.pdf`;
-  doc.save(name);
+
+  if (slips.length === 1) {
+    const slip = slips[0]!;
+    const pdf = await generateSalarySlipPDF(slip, headerImage);
+    downloadBlob(pdf, slipFilename(slip));
+    return;
+  }
+
+  const zip = new JSZip();
+  const filenames = new Set<string>();
+  for (const [index, slip] of slips.entries()) {
+    let filename = slipFilename(slip);
+    const extension = ".pdf";
+    const base = filename.slice(0, -extension.length);
+    let duplicateNumber = 2;
+    while (filenames.has(filename)) {
+      filename = `${base} (${duplicateNumber})${extension}`;
+      duplicateNumber += 1;
+    }
+    filenames.add(filename);
+
+    try {
+      const pdf = await generateSalarySlipPDF(slip, headerImage);
+      zip.file(filename, pdf);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unknown PDF generation error.";
+      throw new Error(`Unable to generate salary slip for ${slip.employee.name}: ${reason}`, {
+        cause: error,
+      });
+    }
+    options.onProgress?.(index + 1, slips.length);
+  }
+
+  const archive = await zip.generateAsync({ type: "blob" });
+  downloadBlob(archive, `Salary Slips - ${sanitizeFilename(monthLabel(slips[0]!.month))}.zip`);
 }

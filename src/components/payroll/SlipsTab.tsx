@@ -38,6 +38,8 @@ export function SlipsTab({ employees, batches, notify }: Props) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("employee");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const empById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
@@ -113,6 +115,7 @@ export function SlipsTab({ employees, batches, notify }: Props) {
     setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.employee.id)));
 
   const download = async () => {
+    if (isDownloading) return;
     const picked = rows.filter((r) => selected.has(r.employee.id));
     if (!picked.length) {
       notify("Select at least one employee to generate slips.", "warn");
@@ -126,11 +129,23 @@ export function SlipsTab({ employees, batches, notify }: Props) {
       outstandingAdvance: outstandingAdvance(employee.id, batches),
     }));
     try {
-      await downloadSlips(slips);
+      setIsDownloading(true);
+      setDownloadProgress(slips.length > 1 ? 0 : null);
+      await downloadSlips(slips, {
+        onProgress: (completed) => setDownloadProgress(completed),
+      });
       notify(`${slips.length} salary slip(s) downloaded.`);
     } catch (error) {
       console.error("Unable to generate salary slips.", error);
-      notify("Unable to generate salary slips. Please try again.", "warn");
+      notify(
+        error instanceof Error
+          ? error.message
+          : "Unable to generate salary slips. Please try again.",
+        "warn",
+      );
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -172,8 +187,10 @@ export function SlipsTab({ employees, batches, notify }: Props) {
           {allSelected ? <CheckSquare size={15} /> : <Square size={15} />}
           {allSelected ? "Clear all" : "Select all"}
         </button>
-        <button onClick={download} className={btnGold}>
+        <button onClick={download} disabled={isDownloading} className={btnGold}>
           <FileDown size={16} /> Download {selected.size || ""} slip{selected.size === 1 ? "" : "s"}
+          {downloadProgress !== null &&
+            ` — Generating salary slips... ${downloadProgress} of ${selected.size}`}
         </button>
       </div>
 
