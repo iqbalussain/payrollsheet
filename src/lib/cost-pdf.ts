@@ -38,20 +38,20 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
   );
 
   const cols: Array<[string, number, "l" | "r"]> = [
-    ["Emp ID", 22, "l"],
-    ["Name", 40, "l"],
-    ["Site", 30, "l"],
-    ["Foreman", 28, "l"],
-    ["Month", 20, "l"],
-    ["Days", 14, "r"],
-    ["Basic", 22, "r"],
-    ["OT", 14, "r"],
-    ["Allow.", 16, "r"],
-    ["Deduct.", 20, "r"],
-    ["Total", 22, "r"],
-    ["Allocated", 22, "r"],
-    ["%", 12, "r"],
-    ["Remaining", 22, "r"],
+    ["Emp ID", 18, "l"],
+    ["Employee", 30, "l"],
+    ["Trade", 18, "l"],
+    ["Site", 23, "l"],
+    ["Foreman", 22, "l"],
+    ["Month", 17, "l"],
+    ["Hrs", 12, "r"],
+    ["Basic", 19, "r"],
+    ["Food Deduct.", 20, "r"],
+    ["Outstanding", 20, "r"],
+    ["Total", 19, "r"],
+    ["Allocated", 20, "r"],
+    ["%", 9, "r"],
+    ["Remaining", 20, "r"],
   ];
 
   const drawHead = (y: number) => {
@@ -90,14 +90,14 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
     const values: string[] = [
       r.employeeId,
       r.name,
+      r.trade,
       r.site,
       r.foreman,
       r.month,
-      fmt(r.days),
+      fmt(r.hours),
       fmt(r.basic),
-      fmt(r.overtime),
-      fmt(r.allowances),
-      fmt(r.deductions),
+      fmt(r.foodDeduction),
+      fmt(r.outstanding),
       fmt(r.total),
       fmt(r.allocated),
       `${r.allocationPct.toFixed(0)}%`,
@@ -106,7 +106,7 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
     let x = L + 2;
     values.forEach((v, ci) => {
       const [, w, align] = cols[ci]!;
-      const text = align === "l" ? doc.splitTextToSize(v, w - 3)[0] ?? "" : v;
+      const text = align === "l" ? (doc.splitTextToSize(v, w - 3)[0] ?? "") : v;
       doc.text(String(text), align === "r" ? x + w - 4 : x, y, {
         align: align === "r" ? "right" : "left",
       });
@@ -128,7 +128,7 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.text(
-    `Total staff: ${t.staff}    Total days: ${fmt(t.days)}    Total salary: ${fmt(
+    `Total staff: ${t.staff}    Total hours: ${fmt(rows.reduce((sum, row) => sum + row.hours, 0))}    Total salary: ${fmt(
       t.total,
     )} OMR    Total allocated: ${fmt(t.allocated)} OMR    Remaining: ${fmt(t.remaining)} OMR`,
     L,

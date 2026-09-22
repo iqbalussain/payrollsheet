@@ -1,5 +1,13 @@
 import { useMemo, useState } from "react";
-import { FileDown, CheckSquare, Square, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  FileDown,
+  CheckSquare,
+  Square,
+  Search,
+} from "lucide-react";
 import {
   MONTHS,
   employeeRows,
@@ -21,10 +29,15 @@ interface Props {
   notify: (msg: string, tone?: "ok" | "warn") => void;
 }
 
+type SortKey = "employee" | "trade" | "foreman";
+type SortDirection = "asc" | "desc";
+
 export function SlipsTab({ employees, batches, notify }: Props) {
   const [month, setMonth] = useState(MONTHS[0]!);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("employee");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const empById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
@@ -48,10 +61,43 @@ export function SlipsTab({ employees, batches, notify }: Props) {
           });
         });
       });
-    return out
-      .filter((r) => r.employee.name.toLowerCase().includes(search.toLowerCase()))
-      .sort((a, b) => a.employee.name.localeCompare(b.employee.name));
-  }, [batches, month, empById, search]);
+    const filtered = out.filter((r) =>
+      r.employee.name.toLowerCase().includes(search.toLowerCase()),
+    );
+    return filtered.sort((a, b) => {
+      const aValue =
+        sortKey === "employee"
+          ? a.employee.name
+          : sortKey === "trade"
+            ? a.employee.trade
+            : a.row.foreman || a.row.batchForeman || "";
+      const bValue =
+        sortKey === "employee"
+          ? b.employee.name
+          : sortKey === "trade"
+            ? b.employee.trade
+            : b.row.foreman || b.row.batchForeman || "";
+      const comparison = aValue.localeCompare(bValue);
+      return (
+        (sortDirection === "asc" ? comparison : -comparison) ||
+        a.employee.name.localeCompare(b.employee.name)
+      );
+    });
+  }, [batches, month, empById, search, sortKey, sortDirection]);
+
+  const sortBy = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowUpDown size={13} />;
+    return sortDirection === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />;
+  };
 
   const allSelected = rows.length > 0 && rows.every((r) => selected.has(r.employee.id));
 
@@ -133,13 +179,38 @@ export function SlipsTab({ employees, batches, notify }: Props) {
 
       <div className={card + " overflow-hidden"}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[820px] text-sm">
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="w-10 px-4 py-3" />
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Trade</th>
-                <th className="px-4 py-3">Site / Foreman</th>
+                <th className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => sortBy("employee")}
+                    className="inline-flex items-center gap-1 hover:text-navy"
+                  >
+                    Employee {sortIcon("employee")}
+                  </button>
+                </th>
+                <th className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => sortBy("trade")}
+                    className="inline-flex items-center gap-1 hover:text-navy"
+                  >
+                    Trade {sortIcon("trade")}
+                  </button>
+                </th>
+                <th className="px-4 py-3">Site</th>
+                <th className="px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => sortBy("foreman")}
+                    className="inline-flex items-center gap-1 hover:text-navy"
+                  >
+                    Foreman {sortIcon("foreman")}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-right">Hours</th>
                 <th className="px-4 py-3 text-right">Net (OMR)</th>
                 <th className="px-4 py-3 text-right">Paid</th>
@@ -149,7 +220,7 @@ export function SlipsTab({ employees, batches, notify }: Props) {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={9} className="px-4 py-10 text-center text-slate-400">
                     No payroll lines for {monthLabel(month)}.
                   </td>
                 </tr>
@@ -171,8 +242,9 @@ export function SlipsTab({ employees, batches, notify }: Props) {
                       </td>
                       <td className="px-4 py-2.5 font-medium text-foreground">{employee.name}</td>
                       <td className="px-4 py-2.5 text-slate-600">{employee.trade}</td>
+                      <td className="px-4 py-2.5 text-slate-600">{row.site || "—"}</td>
                       <td className="px-4 py-2.5 text-slate-600">
-                        {row.site || "—"} / {row.foreman || row.batchForeman || "—"}
+                        {row.foreman || row.batchForeman || "—"}
                       </td>
                       <td className="px-4 py-2.5 text-right">{fmt(toNum(row.hours))}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-money">

@@ -1,17 +1,14 @@
 import { useMemo, useState } from "react";
-import { Download, Share2, Search, X } from "lucide-react";
+import { Download, FileSpreadsheet, Share2, Search, X } from "lucide-react";
 import { fmt, MONTHS, monthLabel, type Employee, type PayrollBatch } from "@/lib/payroll";
-import {
-  allocationTotals,
-  buildAllocationRows,
-  type AllocationRow,
-} from "@/lib/cost-allocation";
+import { allocationTotals, buildAllocationRows, type AllocationRow } from "@/lib/cost-allocation";
 import {
   COMPANY_NAME,
   costReportBlob,
   costReportFilename,
   downloadCostReport,
 } from "@/lib/cost-pdf";
+import { downloadCostExcel } from "@/lib/cost-excel";
 import { btnGold, btnOutline, card, input, select } from "./ui";
 
 interface Props {
@@ -23,14 +20,7 @@ interface Props {
   notify?: ((msg: string, tone?: "ok" | "warn") => void) | undefined;
 }
 
-export function CostDetailsModal({
-  open,
-  onClose,
-  batches,
-  employees,
-  month = "",
-  notify,
-}: Props) {
+export function CostDetailsModal({ open, onClose, batches, employees, month = "", notify }: Props) {
   const [query, setQuery] = useState("");
   const [fMonth, setFMonth] = useState(month);
   const [fSite, setFSite] = useState("");
@@ -95,6 +85,9 @@ export function CostDetailsModal({
           <button onClick={() => downloadCostReport(rows, meta)} className={btnGold}>
             <Download size={15} /> Download PDF
           </button>
+          <button onClick={() => downloadCostExcel(rows, meta)} className={btnOutline}>
+            <FileSpreadsheet size={15} /> Download Excel
+          </button>
           <button onClick={share} className={btnOutline}>
             <Share2 size={15} /> Share
           </button>
@@ -148,14 +141,14 @@ export function CostDetailsModal({
               <tr className="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-3 py-2">Emp ID</th>
                 <th className="px-3 py-2">Employee</th>
+                <th className="px-3 py-2">Trade</th>
                 <th className="px-3 py-2">Site</th>
                 <th className="px-3 py-2">Foreman</th>
                 <th className="px-3 py-2">Month</th>
-                <th className="px-3 py-2 text-right">Days</th>
+                <th className="px-3 py-2 text-right">Hrs</th>
                 <th className="px-3 py-2 text-right">Basic</th>
-                <th className="px-3 py-2 text-right">OT</th>
-                <th className="px-3 py-2 text-right">Allow.</th>
-                <th className="px-3 py-2 text-right">Deduct.</th>
+                <th className="px-3 py-2 text-right">Food Deduct.</th>
+                <th className="px-3 py-2 text-right">Outstanding</th>
                 <th className="px-3 py-2 text-right">Total</th>
                 <th className="px-3 py-2 text-right">Allocated</th>
                 <th className="px-3 py-2 text-right">%</th>
@@ -180,14 +173,14 @@ export function CostDetailsModal({
                       {r.employeeId}
                     </td>
                     <td className="px-3 py-2 font-semibold text-navy">{r.name}</td>
+                    <td className="px-3 py-2 text-slate-600">{r.trade}</td>
                     <td className="px-3 py-2 text-slate-600">{r.site}</td>
                     <td className="px-3 py-2 text-slate-600">{r.foreman}</td>
                     <td className="px-3 py-2 text-slate-600">{r.month}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.days)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(r.hours)}</td>
                     <td className="px-3 py-2 text-right">{fmt(r.basic)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.overtime)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.allowances)}</td>
-                    <td className="px-3 py-2 text-right text-danger">{fmt(r.deductions)}</td>
+                    <td className="px-3 py-2 text-right text-danger">{fmt(r.foodDeduction)}</td>
+                    <td className="px-3 py-2 text-right text-warn">{fmt(r.outstanding)}</td>
                     <td className="px-3 py-2 text-right font-bold text-money">{fmt(r.total)}</td>
                     <td className="px-3 py-2 text-right">{fmt(r.allocated)}</td>
                     <td className="px-3 py-2 text-right">{r.allocationPct.toFixed(0)}%</td>
@@ -213,9 +206,15 @@ export function CostDetailsModal({
                   ID {r.employeeId} · {r.site} · {r.foreman} · {r.month}
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
-                  <span>Total <b className="text-money">{fmt(r.total)}</b></span>
-                  <span>Alloc. <b>{fmt(r.allocated)}</b></span>
-                  <span>Rem. <b>{fmt(r.remaining)}</b></span>
+                  <span>
+                    Total <b className="text-money">{fmt(r.total)}</b>
+                  </span>
+                  <span>
+                    Alloc. <b>{fmt(r.allocated)}</b>
+                  </span>
+                  <span>
+                    Rem. <b>{fmt(r.remaining)}</b>
+                  </span>
                 </div>
               </button>
             ))}
@@ -224,7 +223,7 @@ export function CostDetailsModal({
 
         <div className="flex flex-wrap gap-4 border-t-2 border-slate-200 bg-navy-soft/60 px-4 py-3 text-xs font-bold text-navy">
           <span>Total staff: {totals.staff}</span>
-          <span>Total days: {fmt(totals.days)}</span>
+          <span>Total hours: {fmt(totals.hours)}</span>
           <span>Total salary: {fmt(totals.total)} OMR</span>
           <span className="text-money">Total allocated: {fmt(totals.allocated)} OMR</span>
           <span>Remaining: {fmt(totals.remaining)} OMR</span>
@@ -236,10 +235,7 @@ export function CostDetailsModal({
           className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
           onClick={() => setDetail(null)}
         >
-          <div
-            className={card + " w-full max-w-md p-5"}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className={card + " w-full max-w-md p-5"} onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-extrabold text-navy">{detail.name}</h3>
@@ -252,22 +248,25 @@ export function CostDetailsModal({
               </button>
             </div>
             <dl className="space-y-1 text-sm">
-              {([
-                ["Site / project", detail.site],
-                ["Foreman", detail.foreman],
-                ["Month", monthLabel(detail.month)],
-                ["Working days", fmt(detail.days)],
-                ["Hours", fmt(detail.hours)],
-                ["Basic salary", fmt(detail.basic)],
-                ["Overtime", fmt(detail.overtime)],
-                ["Allowances", fmt(detail.allowances)],
-                ["Deductions", fmt(detail.deductions)],
-                ["Total salary", fmt(detail.total)],
-                ["Allocated amount", fmt(detail.allocated)],
-                ["Allocation %", `${detail.allocationPct.toFixed(0)}%`],
-                ["Remaining amount", fmt(detail.remaining)],
-              ] as const).map(([k, v]) => (
-                <div key={k} className="flex justify-between border-b border-border py-1 last:border-0">
+              {(
+                [
+                  ["Site / project", detail.site],
+                  ["Foreman", detail.foreman],
+                  ["Month", monthLabel(detail.month)],
+                  ["Hours", fmt(detail.hours)],
+                  ["Basic salary", fmt(detail.basic)],
+                  ["Food deduction", fmt(detail.foodDeduction)],
+                  ["Outstanding advance", fmt(detail.outstanding)],
+                  ["Total salary", fmt(detail.total)],
+                  ["Allocated amount", fmt(detail.allocated)],
+                  ["Allocation %", `${detail.allocationPct.toFixed(0)}%`],
+                  ["Remaining amount", fmt(detail.remaining)],
+                ] as const
+              ).map(([k, v]) => (
+                <div
+                  key={k}
+                  className="flex justify-between border-b border-border py-1 last:border-0"
+                >
                   <dt className="text-slate-500">{k}</dt>
                   <dd className="font-semibold text-foreground">{v}</dd>
                 </div>

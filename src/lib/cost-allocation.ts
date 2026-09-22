@@ -1,9 +1,4 @@
-import {
-  lineGross,
-  toNum,
-  type Employee,
-  type PayrollBatch,
-} from "./payroll";
+import { lineGross, toNum, type Employee, type PayrollBatch } from "./payroll";
 
 export interface AllocationRow {
   key: string;
@@ -14,11 +9,9 @@ export interface AllocationRow {
   foreman: string;
   month: string;
   hours: number;
-  days: number;
   basic: number;
-  overtime: number;
-  allowances: number;
-  deductions: number;
+  foodDeduction: number;
+  outstanding: number;
   total: number;
   allocated: number;
   allocationPct: number;
@@ -31,38 +24,41 @@ export function buildAllocationRows(
   employees: Employee[],
 ): AllocationRow[] {
   const byId = new Map(employees.map((e) => [String(e.id), e]));
+  const advances = new Map<string, number>();
   const rows: AllocationRow[] = [];
-  batches.forEach((b) => {
-    b.lines.forEach((l, i) => {
-      if (!l.employee_id) return;
-      const emp = byId.get(String(l.employee_id));
-      const hours = toNum(l.hours);
-      const basic = lineGross(l);
-      const deductions =
-        toNum(l.food_deduction) + toNum(l.prev_advance) + toNum(l.other_deduction);
-      const total = toNum(l.net_salary);
-      const allocated = toNum(l.paid);
-      rows.push({
-        key: `${b.id}-${l.id ?? i}`,
-        employeeId: emp?.id_number?.trim() ? emp.id_number.trim() : "Not Assigned",
-        name: emp?.name ?? `Employee #${l.employee_id}`,
-        trade: emp?.trade ?? "—",
-        site: b.site || "(No Site)",
-        foreman: l.foreman || b.foreman || "(No Foreman)",
-        month: b.month,
-        hours,
-        days: Math.round((hours / 8) * 100) / 100,
-        basic,
-        overtime: 0,
-        allowances: 0,
-        deductions,
-        total,
-        allocated,
-        allocationPct: total > 0 ? (allocated / total) * 100 : 0,
-        remaining: total - allocated,
+  [...batches]
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .forEach((b) => {
+      b.lines.forEach((l, i) => {
+        if (!l.employee_id) return;
+        const emp = byId.get(String(l.employee_id));
+        const hours = toNum(l.hours);
+        const basic = lineGross(l);
+        const total = toNum(l.net_salary);
+        const allocated = toNum(l.paid);
+        const employeeKey = String(l.employee_id);
+        const outstanding =
+          (advances.get(employeeKey) ?? 0) + toNum(l.new_advance) - toNum(l.prev_advance);
+        advances.set(employeeKey, Math.max(0, outstanding));
+        rows.push({
+          key: `${b.id}-${l.id ?? i}`,
+          employeeId: emp?.id_number?.trim() ? emp.id_number.trim() : "Not Assigned",
+          name: emp?.name ?? `Employee #${l.employee_id}`,
+          trade: emp?.trade ?? "—",
+          site: b.site || "(No Site)",
+          foreman: l.foreman || b.foreman || "(No Foreman)",
+          month: b.month,
+          hours,
+          basic,
+          foodDeduction: toNum(l.food_deduction),
+          outstanding: Math.max(0, outstanding),
+          total,
+          allocated,
+          allocationPct: total > 0 ? (allocated / total) * 100 : 0,
+          remaining: total - allocated,
+        });
       });
     });
-  });
   return rows;
 }
 
@@ -71,9 +67,9 @@ export function allocationTotals(rows: AllocationRow[]) {
   return {
     staff: new Set(rows.map((r) => r.name)).size,
     hours: sum((r) => r.hours),
-    days: sum((r) => r.days),
     basic: sum((r) => r.basic),
-    deductions: sum((r) => r.deductions),
+    foodDeduction: sum((r) => r.foodDeduction),
+    outstanding: sum((r) => r.outstanding),
     total: sum((r) => r.total),
     allocated: sum((r) => r.allocated),
     remaining: sum((r) => r.remaining),
