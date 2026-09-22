@@ -106,10 +106,11 @@ function drawCard(
   const height = 77;
   const headerHeight = 12;
   const panelInset = 3.5;
-  const valueBoxWidth = 33.5;
+  const columnGap = 3.5;
+  const valueBoxWidth = Math.min(28.5, Math.max(27.5, width * 0.52));
   const valueBoxHeight = 7.6;
   const rowStart = y + 23.5;
-  const rowStep = 11.5;
+  const rowStep = 13.5;
   const totalRowY = y + height - 5.8;
 
   doc.setFillColor(249, 250, 251);
@@ -128,13 +129,24 @@ function drawCard(
   const drawValueBox = (label: string, value: string, rowY: number, emphasis = false) => {
     const innerLeft = x + panelInset;
     const valueRight = x + width - panelInset;
-    const labelWidth = valueRight - innerLeft - valueBoxWidth - 2.5;
+    const labelWidth = valueRight - innerLeft - valueBoxWidth - columnGap;
     const valueLeft = valueRight - valueBoxWidth;
 
     doc.setFont("helvetica", emphasis ? "bold" : "bold");
-    fitFontSize(doc, label, labelWidth, 8.25, 6.25);
+    let labelFontSize = 8.25;
+    let labelLines: string[] = [];
+    while (labelFontSize > 6.25) {
+      doc.setFontSize(labelFontSize);
+      labelLines = doc.splitTextToSize(label, labelWidth);
+      if (labelLines.length <= 2) break;
+      labelFontSize -= 0.25;
+    }
+    doc.setFontSize(Math.max(labelFontSize, 6.25));
+    labelLines = doc.splitTextToSize(label, labelWidth);
     doc.setTextColor(...INK);
-    doc.text(label, innerLeft, rowY);
+    const labelLineHeight = 3.1;
+    const firstLabelLineY = rowY - ((labelLines.length - 1) * labelLineHeight) / 2;
+    doc.text(labelLines, innerLeft, firstLabelLineY, { lineHeightFactor: 1 });
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...color);
@@ -154,9 +166,9 @@ function drawCard(
   doc.roundedRect(x + 2.5, y + height - 11.5, width - 5, 9, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  const totalLabelWidth = width - valueBoxWidth - 10;
+  const totalLabelWidth = width - panelInset * 2 - valueBoxWidth - columnGap;
   fitFontSize(doc, total.label, totalLabelWidth, 8.5, 6.25);
-  doc.text(total.label, x + panelInset + 1.5, totalRowY);
+  doc.text(total.label, x + panelInset, totalRowY);
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...color);
   doc.roundedRect(
