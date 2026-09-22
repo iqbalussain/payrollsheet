@@ -104,62 +104,74 @@ function drawCard(
   total: { label: string; value: string },
 ) {
   const height = 77;
+  const headerHeight = 12;
+  const panelInset = 3.5;
+  const valueBoxWidth = 33.5;
+  const valueBoxHeight = 7.6;
+  const rowStart = y + 23.5;
+  const rowStep = 11.5;
+  const totalRowY = y + height - 5.8;
+
   doc.setFillColor(249, 250, 251);
   doc.setDrawColor(225, 229, 233);
   doc.setLineWidth(0.25);
   doc.roundedRect(x, y, width, height, 2, 2, "FD");
 
   doc.setFillColor(...color);
-  doc.roundedRect(x, y, width, 12, 2, 2, "F");
+  doc.roundedRect(x, y, width, headerHeight, 2, 2, "F");
   doc.rect(x, y + 7, width, 5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   fitFontSize(doc, title, width - 8, 11, 8);
-  doc.text(title, x + width / 2, y + 8, { align: "center" });
+  doc.text(title, x + width / 2, y + 8.1, { align: "center" });
 
-  let rowY = y + 23;
-  rows.forEach(({ label, value, emphasis }) => {
-    const innerLeft = x + 3;
-    const innerRight = x + width - 3;
-    const valueWidth = Math.min(31, Math.max(25, doc.getTextWidth(value) + 6));
-    const labelWidth = innerRight - innerLeft - valueWidth - 2;
-    const valueX = innerRight;
-    doc.setFont("helvetica", emphasis ? "bold" : "normal");
-    fitFontSize(doc, label, labelWidth, 8.5, 6.25);
+  const drawValueBox = (label: string, value: string, rowY: number, emphasis = false) => {
+    const innerLeft = x + panelInset;
+    const valueRight = x + width - panelInset;
+    const labelWidth = valueRight - innerLeft - valueBoxWidth - 2.5;
+    const valueLeft = valueRight - valueBoxWidth;
+
+    doc.setFont("helvetica", emphasis ? "bold" : "bold");
+    fitFontSize(doc, label, labelWidth, 8.25, 6.25);
     doc.setTextColor(...INK);
     doc.text(label, innerLeft, rowY);
+
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(...color);
-    doc.roundedRect(valueX - valueWidth, rowY - 5.1, valueWidth, 7, 1.5, 1.5, "FD");
+    doc.setLineWidth(0.35);
+    doc.roundedRect(valueLeft, rowY - 5.35, valueBoxWidth, valueBoxHeight, 1.35, 1.35, "FD");
     doc.setFont("helvetica", emphasis ? "bold" : "normal");
-    fitFontSize(doc, value, valueWidth - 5, 8, 6.25);
+    fitFontSize(doc, value || "—", valueBoxWidth - 5, emphasis ? 8.25 : 8, 6.25);
     doc.setTextColor(...INK);
-    doc.text(value, valueX - 2, rowY, { align: "right" });
-    rowY += 12;
+    doc.text(value || "—", valueRight - 2.25, rowY, { align: "right" });
+  };
+
+  rows.forEach(({ label, value, emphasis }, index) => {
+    drawValueBox(label, value, rowStart + index * rowStep, emphasis);
   });
 
   doc.setFillColor(...color);
-  doc.roundedRect(x + 2.5, y + height - 11, width - 5, 8, 1.5, 1.5, "F");
+  doc.roundedRect(x + 2.5, y + height - 11.5, width - 5, 9, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  fitFontSize(doc, total.label, width - 34, 8.5, 6.25);
-  doc.text(total.label, x + 5, y + height - 5.5);
-  const totalValueWidth = Math.min(29, Math.max(25, doc.getTextWidth(total.value) + 6));
+  const totalLabelWidth = width - valueBoxWidth - 10;
+  fitFontSize(doc, total.label, totalLabelWidth, 8.5, 6.25);
+  doc.text(total.label, x + panelInset + 1.5, totalRowY);
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...color);
   doc.roundedRect(
-    x + width - totalValueWidth - 2.5,
-    y + height - 10.5,
-    totalValueWidth,
-    7,
-    1.2,
-    1.2,
+    x + width - panelInset - valueBoxWidth,
+    y + height - 10.8,
+    valueBoxWidth,
+    valueBoxHeight,
+    1.35,
+    1.35,
     "FD",
   );
   doc.setTextColor(...INK);
   doc.setFont("helvetica", "bold");
-  fitFontSize(doc, total.value, totalValueWidth - 5, 8, 6.25);
-  doc.text(total.value, x + width - 5, y + height - 5.5, { align: "right" });
+  fitFontSize(doc, total.value, valueBoxWidth - 5, 8.25, 6.25);
+  doc.text(total.value, x + width - panelInset - 2.25, totalRowY, { align: "right" });
 }
 
 function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
