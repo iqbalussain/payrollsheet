@@ -82,7 +82,7 @@ export function useSaveEmployee() {
   });
 }
 
-export function useSaveBatch() {
+export function useSaveBatch(canDelete = false) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (batch: PayrollBatch) => {
@@ -93,11 +93,6 @@ export function useSaveBatch() {
           .update({ month: batch.month, site: batch.site, foreman: batch.foreman })
           .eq("id", batchId);
         if (error) throw error;
-        const { error: de } = await supabase
-          .from("payroll_lines")
-          .delete()
-          .eq("batch_id", batchId);
-        if (de) throw de;
       } else {
         const { data, error } = await supabase
           .from("payroll_batches")
@@ -110,6 +105,7 @@ export function useSaveBatch() {
       const rows = batch.lines
         .filter((l) => l.employee_id)
         .map((l) => ({
+          ...(l.id ? { id: l.id } : {}),
           batch_id: batchId,
           employee_id: Number(l.employee_id),
           month: batch.month,
@@ -123,9 +119,29 @@ export function useSaveBatch() {
           net_salary: toNum(l.net_salary),
           paid: toNum(l.paid),
         }));
-      if (rows.length) {
-        const { error } = await supabase.from("payroll_lines").insert(rows);
+
+      let previousLineIds: string[] = [];
+      if (batch.id && canDelete) {
+        const { data, error } = await supabase
+          .from("payroll_lines")
+          .select("id")
+          .eq("batch_id", batchId);
         if (error) throw error;
+        previousLineIds = (data ?? []).map((line) => line.id);
+      }
+
+      if (rows.length) {
+        const { error } = await supabase.from("payroll_lines").upsert(rows, { onConflict: "id" });
+        if (error) throw error;
+      }
+
+      if (batch.id && canDelete) {
+        const retainedIds = new Set(rows.flatMap((row) => (row.id ? [row.id] : [])));
+        const removedIds = previousLineIds.filter((id) => !retainedIds.has(id));
+        if (removedIds.length) {
+          const { error } = await supabase.from("payroll_lines").delete().in("id", removedIds);
+          if (error) throw error;
+        }
       }
       return batchId;
     },
@@ -207,10 +223,7 @@ export function useSaveAdvance() {
         notes: tx.notes ?? "",
       };
       if (tx.id) {
-        const { error } = await dbAny
-          .from("advance_transactions")
-          .update(payload)
-          .eq("id", tx.id);
+        const { error } = await dbAny.from("advance_transactions").update(payload).eq("id", tx.id);
         if (error) throw error;
       } else {
         const { error } = await dbAny.from("advance_transactions").insert(payload);

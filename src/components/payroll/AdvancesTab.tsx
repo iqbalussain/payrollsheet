@@ -24,6 +24,7 @@ interface Props {
   notify: (msg: string, tone?: "ok" | "warn") => void;
   onSave: (tx: Partial<AdvanceTx> & { id?: string }, done: () => void) => void;
   onDelete: (id: string) => void;
+  canDelete: boolean;
 }
 
 interface Form {
@@ -55,6 +56,7 @@ export function AdvancesTab({
   notify,
   onSave,
   onDelete,
+  canDelete,
 }: Props) {
   const [form, setForm] = useState<Form>(emptyForm());
   const [open, setOpen] = useState(false);
@@ -97,7 +99,7 @@ export function AdvancesTab({
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [advances, filterEmployee, query, empById, outstandingEmployeeIds]);
 
-  const selected = filterEmployee ? empById.get(filterEmployee) ?? null : null;
+  const selected = filterEmployee ? (empById.get(filterEmployee) ?? null) : null;
   const outstandingEmployees = useMemo(
     () =>
       employees
@@ -126,17 +128,14 @@ export function AdvancesTab({
       .filter((a) => String(a.employee_id) === String(selected.id))
       .forEach((a) => months.add(txMonth(a.date)));
     batches.forEach((b) => {
-      if (b.lines.some((l) => String(l.employee_id) === String(selected.id)))
-        months.add(b.month);
+      if (b.lines.some((l) => String(l.employee_id) === String(selected.id))) months.add(b.month);
     });
     return [...months]
       .filter(Boolean)
       .sort()
       .map((m) => {
         const issued = advances
-          .filter(
-            (a) => String(a.employee_id) === String(selected.id) && txMonth(a.date) === m,
-          )
+          .filter((a) => String(a.employee_id) === String(selected.id) && txMonth(a.date) === m)
           .reduce((s, a) => s + toNum(a.amount), 0);
         let payrollAdv = 0;
         let recovered = 0;
@@ -152,14 +151,11 @@ export function AdvancesTab({
           );
         return { month: m, issued: issued + payrollAdv, recovered };
       })
-      .reduce<{ month: string; issued: number; recovered: number; balance: number }[]>(
-        (acc, r) => {
-          const prev = acc.length ? acc[acc.length - 1]!.balance : 0;
-          acc.push({ ...r, balance: Math.max(0, prev + r.issued - r.recovered) });
-          return acc;
-        },
-        [],
-      );
+      .reduce<{ month: string; issued: number; recovered: number; balance: number }[]>((acc, r) => {
+        const prev = acc.length ? acc[acc.length - 1]!.balance : 0;
+        acc.push({ ...r, balance: Math.max(0, prev + r.issued - r.recovered) });
+        return acc;
+      }, []);
   }, [selected, advances, batches]);
 
   const submit = () => {
@@ -185,7 +181,9 @@ export function AdvancesTab({
 
   return (
     <div className="space-y-4">
-      <div className={card + " mobile-toolbar flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:p-4"}>
+      <div
+        className={card + " mobile-toolbar flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:p-4"}
+      >
         <div className="flex-1">
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
             Employee
@@ -234,10 +232,16 @@ export function AdvancesTab({
       <div className="mobile-metric-grid grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
           { label: "Advances listed", value: fmt(totals.issued) },
-          { label: selected ? "Recovered via payroll" : "Transactions", value: selected ? fmt(totals.recovered) : String(rows.length) },
+          {
+            label: selected ? "Recovered via payroll" : "Transactions",
+            value: selected ? fmt(totals.recovered) : String(rows.length),
+          },
           { label: "Outstanding balance", value: fmt(totals.outstanding) },
         ].map((s) => (
-          <div key={s.label} className={`${card} p-3 ${s.label === "Outstanding balance" ? "mobile-metric-alert col-span-2 sm:col-span-1" : ""}`}>
+          <div
+            key={s.label}
+            className={`${card} p-3 ${s.label === "Outstanding balance" ? "mobile-metric-alert col-span-2 sm:col-span-1" : ""}`}
+          >
             <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {s.label}
             </p>
@@ -366,17 +370,25 @@ export function AdvancesTab({
             rows.map((a) => {
               const emp = empById.get(String(a.employee_id));
               return (
-                 <div key={a.id} className="mobile-list-card block rounded-lg border border-border bg-card p-3">
+                <div
+                  key={a.id}
+                  className="mobile-list-card block rounded-lg border border-border bg-card p-3"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-navy">{emp?.name ?? `#${a.employee_id}`}</p>
-                      <p className="text-[11px] text-slate-500">{a.date} · {a.reason || "No reason"}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {a.date} · {a.reason || "No reason"}
+                      </p>
                     </div>
                     <p className="font-bold text-warn">{fmt(toNum(a.amount))} OMR</p>
                   </div>
                   <div className="mt-2 flex items-center justify-between border-t border-border pt-2 text-xs">
                     <span className="text-slate-500">
-                      Outstanding: <strong className="text-navy">{fmt(advanceOutstanding(a.employee_id, batches, advances))}</strong>
+                      Outstanding:{" "}
+                      <strong className="text-navy">
+                        {fmt(advanceOutstanding(a.employee_id, batches, advances))}
+                      </strong>
                     </span>
                     <div className="flex gap-1.5">
                       <button
@@ -397,13 +409,15 @@ export function AdvancesTab({
                       >
                         <Save size={14} />
                       </button>
-                      <button
-                        title="Delete"
-                        onClick={() => onDelete(a.id)}
-                        className={btnIcon + " hover:border-danger hover:text-danger"}
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {canDelete && (
+                        <button
+                          title="Delete"
+                          onClick={() => onDelete(a.id)}
+                          className={btnIcon + " hover:border-danger hover:text-danger"}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -471,13 +485,15 @@ export function AdvancesTab({
                           >
                             <Save size={14} />
                           </button>
-                          <button
-                            title="Delete"
-                            onClick={() => onDelete(a.id)}
-                            className={btnIcon + " hover:border-danger hover:text-danger"}
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          {canDelete && (
+                            <button
+                              title="Delete"
+                              onClick={() => onDelete(a.id)}
+                              className={btnIcon + " hover:border-danger hover:text-danger"}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -519,9 +535,7 @@ export function AdvancesTab({
                   <tr key={employee.id} className="border-b border-border last:border-0">
                     <td className="px-4 py-2.5 font-semibold text-navy">{employee.name}</td>
                     <td className="px-4 py-2.5 text-slate-600">{employee.trade}</td>
-                    <td className="px-4 py-2.5 text-right font-bold text-money">
-                      {fmt(balance)}
-                    </td>
+                    <td className="px-4 py-2.5 text-right font-bold text-money">{fmt(balance)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -561,8 +575,8 @@ export function AdvancesTab({
       {selected && (
         <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs font-medium text-slate-700">
           Total advances issued to {selected.name}:{" "}
-          <strong>{fmt(advancesIssued(selected.id, advances))} OMR</strong> — unpaid balance
-          carries forward automatically into the next payroll month.
+          <strong>{fmt(advancesIssued(selected.id, advances))} OMR</strong> — unpaid balance carries
+          forward automatically into the next payroll month.
         </p>
       )}
     </div>

@@ -1,17 +1,17 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "./types";
 
 // External Supabase project used by the payroll app.
 // The publishable (anon) key is safe to ship in client code; access is guarded by RLS.
-const EXTERNAL_SUPABASE_URL = 'https://milcjipktyhlwiriujrw.supabase.co';
+const EXTERNAL_SUPABASE_URL = "https://milcjipktyhlwiriujrw.supabase.co";
 const EXTERNAL_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pbGNqaXBrdHlobHdpcml1anJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNzE2ODgsImV4cCI6MjEwMzc0NzY4OH0.kl4tQZKyt-41vtFYZ4hqwOIOvRnkYLnqC0KwoFE7YZk';
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pbGNqaXBrdHlobHdpcml1anJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxNzE2ODgsImV4cCI6MjEwMzc0NzY4OH0.kl4tQZKyt-41vtFYZ4hqwOIOvRnkYLnqC0KwoFE7YZk";
 
 function create() {
   return createClient<Database>(EXTERNAL_SUPABASE_URL, EXTERNAL_SUPABASE_ANON_KEY, {
     auth: {
-      persistSession: false,
-      autoRefreshToken: false,
+      persistSession: true,
+      autoRefreshToken: true,
     },
   });
 }

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart2,
   CheckCircle2,
@@ -10,12 +11,14 @@ import {
   Users,
   Banknote,
   AlertTriangle,
-  Bell,
   Home,
+  LogOut,
   Plus,
   ReceiptText,
 } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 
+import { LoginPage } from "@/components/payroll/LoginPage";
 import { EmployeesTab } from "@/components/payroll/EmployeesTab";
 import { PayrollTab } from "@/components/payroll/PayrollTab";
 import { HistoryTab } from "@/components/payroll/HistoryTab";
@@ -38,6 +41,7 @@ import {
   useDeleteAdvance,
 } from "@/lib/payroll-data";
 import type { AdvanceTx, Employee, EmployeeStatus, PayrollBatch } from "@/lib/payroll";
+import { db } from "@/integrations/supabase/external-client";
 
 const TITLE = "Site Payroll Manager — Wages, Advances & Salary Slips";
 const DESCRIPTION =
@@ -54,7 +58,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  component: Index,
+  component: AuthGate,
 });
 
 const TABS = [
@@ -76,7 +80,105 @@ const emptyForm: EmployeeForm = {
   status: "Active",
 };
 
-function Index() {
+function AuthGate() {
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [role, setRole] = useState<string | null>(null);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [roleError, setRoleError] = useState("");
+  const currentUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const { data: listener } = db.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
+    });
+
+    void db.auth.getSession().then(({ data, error }) => {
+      if (!active) return;
+      if (error) setRoleError(error.message);
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const userId = session?.user.id ?? null;
+  useEffect(() => {
+    if (currentUserId.current !== userId) {
+      queryClient.clear();
+      currentUserId.current = userId;
+    }
+
+    if (!userId) {
+      setRole(null);
+      setRoleError("");
+      setRoleLoading(false);
+      return;
+    }
+
+    let active = true;
+    setRole(null);
+    setRoleError("");
+    setRoleLoading(true);
+    void db
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active) return;
+        setRole(data?.role ?? null);
+        setRoleError(error?.message ?? "");
+        setRoleLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [queryClient, userId]);
+
+  if (authLoading || (userId && roleLoading)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm font-semibold text-muted-foreground">
+        Checking secure access…
+      </div>
+    );
+  }
+
+  if (!session) return <LoginPage />;
+
+  if (roleError || (role !== "admin" && role !== "hr")) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-canvas px-4">
+        <section className="w-full max-w-lg rounded-2xl border border-border bg-card p-7 text-center shadow-lg">
+          <h1 className="font-display text-xl font-extrabold text-navy">Access not configured</h1>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            {roleError
+              ? `We could not verify your payroll role: ${roleError}`
+              : "Your account does not have an Admin or HR role. Ask your payroll administrator to assign access."}
+          </p>
+          <button
+            onClick={() => void db.auth.signOut()}
+            className="mt-6 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-navy px-4 text-sm font-semibold text-white hover:bg-navy-dark"
+          >
+            <LogOut size={15} /> Sign out
+          </button>
+        </section>
+      </main>
+    );
+  }
+
+  return <Dashboard role={role} email={session.user.email ?? ""} />;
+}
+
+function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: string }) {
   const [tab, setTab] = useState<TabId>("employees");
   const [mode, setMode] = useState<ModalMode>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
@@ -85,7 +187,8 @@ function Index() {
   const employeesQuery = useEmployees();
   const batchesQuery = useBatches();
   const saveEmployee = useSaveEmployee();
-  const saveBatch = useSaveBatch();
+  const canDelete = role === "admin";
+  const saveBatch = useSaveBatch(canDelete);
   const deleteBatch = useDeleteBatch();
   const advancesQuery = useAdvances();
   const saveAdvance = useSaveAdvance();
@@ -173,7 +276,21 @@ function Index() {
             <p>Site Payroll</p>
             <strong>{showHome ? "Home" : tabTitle[tab]}</strong>
           </div>
-          <button className="mobile-header-action" aria-label="Notifications"><Bell size={19} /></button>
+          <div className="ml-auto hidden text-right sm:block">
+            <p className="max-w-56 truncate text-xs font-semibold text-navy">{email}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+              {role}
+            </p>
+          </div>
+          <button
+            onClick={() => void db.auth.signOut()}
+            className="ml-auto inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-navy hover:bg-navy-soft sm:ml-3"
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut size={15} />
+            <span className="max-sm:hidden">Sign out</span>
+          </button>
           <p className="mt-1 text-sm text-muted-foreground max-sm:hidden">
             Add, review and update worker salary records — stored securely in the cloud database.
           </p>
@@ -200,16 +317,17 @@ function Index() {
           {mobileTabs.map(({ id, label, icon: Icon }) => {
             const active = id === "home" ? showHome : tab === id;
             return (
-            <button
-              key={id}
-              onClick={() => setTab(id === "home" ? "history" : id)}
-              aria-current={active ? "page" : undefined}
-              className={`mobile-bottom-tab ${active ? "is-active" : ""}`}
-            >
-              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-              <span>{label}</span>
-            </button>
-          )})}
+              <button
+                key={id}
+                onClick={() => setTab(id === "home" ? "history" : id)}
+                aria-current={active ? "page" : undefined}
+                className={`mobile-bottom-tab ${active ? "is-active" : ""}`}
+              >
+                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         {error && (
@@ -220,89 +338,103 @@ function Index() {
 
         {showHome && (
           <div className="mobile-home-switcher">
-            <button onClick={() => setTab("history")} className={tab === "history" ? "is-active" : ""}><History size={17} /> History</button>
-            <button onClick={() => setTab("slips")} className={tab === "slips" ? "is-active" : ""}><ReceiptText size={17} /> Salary slips</button>
+            <button
+              onClick={() => setTab("history")}
+              className={tab === "history" ? "is-active" : ""}
+            >
+              <History size={17} /> History
+            </button>
+            <button onClick={() => setTab("slips")} className={tab === "slips" ? "is-active" : ""}>
+              <ReceiptText size={17} /> Salary slips
+            </button>
           </div>
         )}
 
         <main key={tab} className="mobile-screen-enter">
-        {tab === "employees" && (
-          <EmployeesTab
-            employees={employees}
-            batches={batches}
-            loading={employeesQuery.isLoading}
-            onNew={() => {
-              setForm(emptyForm);
-              setMode("new");
-            }}
-            onView={(e) => openFor(e, "view")}
-            onEdit={(e) => openFor(e, "edit")}
-          />
-        )}
+          {tab === "employees" && (
+            <EmployeesTab
+              employees={employees}
+              batches={batches}
+              loading={employeesQuery.isLoading}
+              onNew={() => {
+                setForm(emptyForm);
+                setMode("new");
+              }}
+              onView={(e) => openFor(e, "view")}
+              onEdit={(e) => openFor(e, "edit")}
+            />
+          )}
 
-        {tab === "payroll" && (
-          <PayrollTab
-            employees={employees}
-            batches={batches}
-            advances={advances}
-            saving={saveBatch.isPending}
-            notify={notify}
-            onNewEmployee={() => {
-              setForm(emptyForm);
-              setMode("new");
-            }}
-            onSave={(batch) =>
-              saveBatch.mutate(batch, {
-                onSuccess: () => notify("Payroll batch saved."),
-                onError: (e) => notify((e as Error).message, "warn"),
-              })
-            }
-            onDelete={(id) =>
-              deleteBatch.mutate(id, {
-                onSuccess: () => notify("Payroll batch deleted."),
-                onError: (e) => notify((e as Error).message, "warn"),
-              })
-            }
-          />
-        )}
+          {tab === "payroll" && (
+            <PayrollTab
+              employees={employees}
+              batches={batches}
+              advances={advances}
+              saving={saveBatch.isPending}
+              canDelete={canDelete}
+              notify={notify}
+              onNewEmployee={() => {
+                setForm(emptyForm);
+                setMode("new");
+              }}
+              onSave={(batch) =>
+                saveBatch.mutate(batch, {
+                  onSuccess: () => notify("Payroll batch saved."),
+                  onError: (e) => notify((e as Error).message, "warn"),
+                })
+              }
+              onDelete={(id) =>
+                deleteBatch.mutate(id, {
+                  onSuccess: () => notify("Payroll batch deleted."),
+                  onError: (e) => notify((e as Error).message, "warn"),
+                })
+              }
+            />
+          )}
 
-        {tab === "advances" && (
-          <AdvancesTab
-            employees={employees}
-            batches={batches}
-            advances={advances}
-            saving={saveAdvance.isPending}
-            notify={notify}
-            onSave={(tx, done) =>
-              saveAdvance.mutate(tx, {
-                onSuccess: () => {
-                  notify("Advance saved.");
-                  done();
-                },
-                onError: (e) => notify((e as Error).message, "warn"),
-              })
-            }
-            onDelete={(id) =>
-              deleteAdvance.mutate(id, {
-                onSuccess: () => notify("Advance deleted."),
-                onError: (e) => notify((e as Error).message, "warn"),
-              })
-            }
-          />
-        )}
-        {tab === "history" && (
-          <HistoryTab employees={employees} batches={batches} advances={advances} />
-        )}
-        {tab === "slips" && (
-          <SlipsTab employees={employees} batches={batches} notify={notify} />
-        )}
-        {tab === "cost" && (
-          <CostTab batches={batches} employees={employees} notify={notify} />
-        )}
+          {tab === "advances" && (
+            <AdvancesTab
+              employees={employees}
+              batches={batches}
+              advances={advances}
+              saving={saveAdvance.isPending}
+              canDelete={canDelete}
+              notify={notify}
+              onSave={(tx, done) =>
+                saveAdvance.mutate(tx, {
+                  onSuccess: () => {
+                    notify("Advance saved.");
+                    done();
+                  },
+                  onError: (e) => notify((e as Error).message, "warn"),
+                })
+              }
+              onDelete={(id) =>
+                deleteAdvance.mutate(id, {
+                  onSuccess: () => notify("Advance deleted."),
+                  onError: (e) => notify((e as Error).message, "warn"),
+                })
+              }
+            />
+          )}
+          {tab === "history" && (
+            <HistoryTab employees={employees} batches={batches} advances={advances} />
+          )}
+          {tab === "slips" && <SlipsTab employees={employees} batches={batches} notify={notify} />}
+          {tab === "cost" && <CostTab batches={batches} employees={employees} notify={notify} />}
         </main>
 
         {tab === "employees" && (
-          <button onClick={() => { setForm(emptyForm); setMode("new"); }} className="mobile-fab" aria-label="New employee"><Plus size={24} /></button>
+          <button
+            onClick={() => {
+              setForm(emptyForm);
+              setMode("new");
+            }}
+            className="mobile-fab"
+            aria-label="New employee"
+          >
+            <Plus size={24} />
+          </button>
         )}
       </div>
 

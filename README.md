@@ -42,3 +42,21 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Supabase sign-in and payroll roles
+
+The app uses Supabase email/password authentication. Create or invite each user from **Supabase Dashboard → Authentication → Users**; public sign-up is not needed. In the SQL Editor for the same Supabase project that stores the payroll tables, run the SQL in [`supabase/migrations/20260926000000_payroll_auth_roles.sql`](./supabase/migrations/20260926000000_payroll_auth_roles.sql). It preserves existing payroll rows, replaces public table policies, and enables role-based access.
+
+After creating the accounts, assign one `admin` and each HR user in the SQL Editor (replace the example addresses):
+
+```sql
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'admin' FROM auth.users WHERE email = 'admin@company.com'
+ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
+
+INSERT INTO public.user_roles (user_id, role)
+SELECT id, 'hr' FROM auth.users WHERE email = 'hr@company.com'
+ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
+```
+
+Admins can read, create, edit, and delete payroll records. HR can read, create, and edit employee, payroll, and advance records, but cannot delete rows; delete controls are hidden in the HR interface and Supabase RLS also blocks direct delete requests. Users without either role cannot access payroll data. Role changes are managed by an administrator in the SQL Editor.

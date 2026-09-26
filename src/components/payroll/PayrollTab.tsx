@@ -24,6 +24,7 @@ interface Props {
   advances: AdvanceTx[];
   onSave: (batch: PayrollBatch) => void;
   onDelete: (id: string) => void;
+  canDelete: boolean;
   saving: boolean;
   notify: (msg: string, tone?: "ok" | "warn") => void;
   onNewEmployee?: () => void;
@@ -59,7 +60,6 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
       window.removeEventListener("resize", place);
     };
   }, [open]);
-
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -120,41 +120,41 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
       className="employee-picker-sheet fixed z-[70] max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
     >
       {results.length === 0 ? (
-            <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
-          ) : (
-            results.map((e) => {
-              const isLocked = locked.has(String(e.id));
-              return (
-                <button
-                  key={e.id}
-                  type="button"
-                  ref={(element) => {
-                    if (element) optionRefs.current.set(e.id, element);
-                    else optionRefs.current.delete(e.id);
-                  }}
-                  disabled={isLocked}
-                  onMouseDown={(ev) => {
-                    ev.preventDefault();
-                    onPick(String(e.id));
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                   className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
-                    selectableResults[highlightedIndex]?.id === e.id ? "bg-navy-soft" : ""
-                  }`}
-                  aria-selected={selectableResults[highlightedIndex]?.id === e.id}
-                >
-                  <span className="font-semibold text-navy">
-                    {e.name} <span className="font-normal text-slate-400">— {e.trade}</span>
-                  </span>
-                  {isLocked && (
-                    <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-warn">
-                      <Lock size={10} /> paid
-                    </span>
-                  )}
-                </button>
-              );
-            })
+        <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
+      ) : (
+        results.map((e) => {
+          const isLocked = locked.has(String(e.id));
+          return (
+            <button
+              key={e.id}
+              type="button"
+              ref={(element) => {
+                if (element) optionRefs.current.set(e.id, element);
+                else optionRefs.current.delete(e.id);
+              }}
+              disabled={isLocked}
+              onMouseDown={(ev) => {
+                ev.preventDefault();
+                onPick(String(e.id));
+                setOpen(false);
+                setQuery("");
+              }}
+              className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
+                selectableResults[highlightedIndex]?.id === e.id ? "bg-navy-soft" : ""
+              }`}
+              aria-selected={selectableResults[highlightedIndex]?.id === e.id}
+            >
+              <span className="font-semibold text-navy">
+                {e.name} <span className="font-normal text-slate-400">— {e.trade}</span>
+              </span>
+              {isLocked && (
+                <span className="flex items-center gap-1 text-[10px] font-bold uppercase text-warn">
+                  <Lock size={10} /> paid
+                </span>
+              )}
+            </button>
+          );
+        })
       )}
     </div>
   );
@@ -262,6 +262,7 @@ export function PayrollTab({
   advances,
   onSave,
   onDelete,
+  canDelete,
   saving,
   notify,
   onNewEmployee,
@@ -270,10 +271,7 @@ export function PayrollTab({
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
 
-  const monthBatches = useMemo(
-    () => batches.filter((b) => b.month === month),
-    [batches, month],
-  );
+  const monthBatches = useMemo(() => batches.filter((b) => b.month === month), [batches, month]);
 
   const locked = useMemo(
     () => lockedEmployeeIds(batches, month, draft?.id ?? null),
@@ -295,8 +293,7 @@ export function PayrollTab({
     setForemanLine(null);
   }, [month]);
 
-  const startNew = () =>
-    setDraft({ id: "", month, site: "", foreman: "", lines: [emptyLine()] });
+  const startNew = () => setDraft({ id: "", month, site: "", foreman: "", lines: [emptyLine()] });
 
   const setLine = (idx: number, patch: Partial<PayrollLine>) => {
     setDraft((d) => {
@@ -472,15 +469,14 @@ export function PayrollTab({
                         />
                         {l.employee_id !== "" && (carry > 0 || toNum(l.new_advance) > 0) && (
                           <div className="mt-1 space-y-0.5 text-[10px] font-semibold">
-                            <p className="text-warn">Outstanding from previous months: {fmt(carry)}</p>
+                            <p className="text-warn">
+                              Outstanding from previous months: {fmt(carry)}
+                            </p>
                             <p className="text-slate-600">
-                              Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} ·
-                              {" "}Carries to next month:{" "}
+                              Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} · Carries
+                              to next month:{" "}
                               {fmt(
-                                Math.max(
-                                  0,
-                                  carry - toNum(l.prev_advance) + toNum(l.new_advance),
-                                ),
+                                Math.max(0, carry - toNum(l.prev_advance) + toNum(l.new_advance)),
                               )}
                             </p>
                           </div>
@@ -512,12 +508,7 @@ export function PayrollTab({
                           </button>
                         )}
                       </td>
-                      {(
-                        [
-                          "hours",
-                          "rate",
-                        ] as const
-                      ).map((f) => (
+                      {(["hours", "rate"] as const).map((f) => (
                         <td key={f} className="px-2 py-2">
                           <input
                             type="number"
@@ -565,19 +556,21 @@ export function PayrollTab({
                         {fmt(toNum(l.net_salary) - toNum(l.paid))}
                       </td>
                       <td className="px-2 py-2">
-                        <button
-                          type="button"
-                          title="Remove line"
-                          onClick={() =>
-                            setDraft({
-                              ...draft,
-                              lines: draft.lines.filter((_, i) => i !== idx),
-                            })
-                          }
-                          className={btnIcon + " hover:border-danger hover:text-danger"}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        {(canDelete || !l.id) && (
+                          <button
+                            type="button"
+                            title="Remove line"
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                lines: draft.lines.filter((_, i) => i !== idx),
+                              })
+                            }
+                            className={btnIcon + " hover:border-danger hover:text-danger"}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -604,7 +597,10 @@ export function PayrollTab({
           {/* Mobile: one card per employee */}
           <div className="space-y-3 p-3 md:hidden">
             {draft.lines.map((l, idx) => (
-              <div key={idx} className="mobile-payroll-card rounded-lg border border-border bg-card p-3 shadow-sm">
+              <div
+                key={idx}
+                className="mobile-payroll-card rounded-lg border border-border bg-card p-3 shadow-sm"
+              >
                 <div className="mb-2 flex items-start gap-2">
                   <div className="flex-1">
                     <EmployeeSearchSelect
@@ -617,16 +613,18 @@ export function PayrollTab({
                       ID {empIdLabel(employees, l.employee_id)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    title="Remove line"
-                    onClick={() =>
-                      setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== idx) })
-                    }
-                    className={btnIcon + " hover:border-danger hover:text-danger"}
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {(canDelete || !l.id) && (
+                    <button
+                      type="button"
+                      title="Remove line"
+                      onClick={() =>
+                        setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== idx) })
+                      }
+                      className={btnIcon + " hover:border-danger hover:text-danger"}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
 
                 <label className="mb-2 block">
@@ -642,7 +640,7 @@ export function PayrollTab({
                   />
                 </label>
 
-                 <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {(
                     [
                       ["hours", "Hours"],
@@ -668,8 +666,10 @@ export function PayrollTab({
                       />
                     </label>
                   ))}
-                   <div className="self-end rounded-md bg-navy-soft px-3 py-2 text-right">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">Net</span>
+                  <div className="self-end rounded-md bg-navy-soft px-3 py-2 text-right">
+                    <span className="block text-[10px] font-bold uppercase text-slate-500">
+                      Net
+                    </span>
                     <span className="text-sm font-extrabold text-money">
                       {fmt(toNum(l.net_salary))}
                     </span>
@@ -685,14 +685,13 @@ export function PayrollTab({
 
             {totals && (
               <div className="rounded-lg bg-navy-soft/70 px-3 py-2 text-xs font-bold text-navy">
-                Totals — Gross {fmt(totals.gross)} · Net {fmt(totals.net)} · Paid{" "}
-                {fmt(totals.paid)} · Balance {fmt(totals.balance)}
+                Totals — Gross {fmt(totals.gross)} · Net {fmt(totals.net)} · Paid {fmt(totals.paid)}{" "}
+                · Balance {fmt(totals.balance)}
               </div>
             )}
 
             <SlideToSave onSave={save} saving={saving} />
           </div>
-
 
           <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
             <button
@@ -721,7 +720,10 @@ export function PayrollTab({
           const net = b.lines.reduce((s, l) => s + toNum(l.net_salary), 0);
           const paid = b.lines.reduce((s, l) => s + toNum(l.paid), 0);
           return (
-            <div key={b.id} className={card + " mobile-batch-card flex flex-wrap items-center gap-3 p-4"}>
+            <div
+              key={b.id}
+              className={card + " mobile-batch-card flex flex-wrap items-center gap-3 p-4"}
+            >
               <div className="flex-1">
                 <p className="text-sm font-bold text-navy">{b.site || "Unnamed site"}</p>
                 <p className="text-xs text-muted-foreground">
@@ -737,12 +739,14 @@ export function PayrollTab({
               <button onClick={() => setDraft(b)} className={btnPrimary}>
                 <Pencil size={14} /> Edit
               </button>
-              <button
-                onClick={() => onDelete(b.id)}
-                className={btnOutline + " hover:border-danger hover:text-danger"}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(b.id)}
+                  className={btnOutline + " hover:border-danger hover:text-danger"}
+                >
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
             </div>
           );
         })}
