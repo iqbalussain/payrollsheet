@@ -8,7 +8,7 @@ export type Database = {
   };
   public: {
     Tables: {
-      user_roles: {
+      users: {
         Row: {
           role: string;
           user_id: string;

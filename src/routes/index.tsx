@@ -128,7 +128,7 @@ function AuthGate() {
     setRoleError("");
     setRoleLoading(true);
     void db
-      .from("user_roles")
+      .from("users")
       .select("role")
       .eq("user_id", userId)
       .maybeSingle()

@@ -50,11 +50,11 @@ The app uses Supabase email/password authentication. Create or invite each user 
 After creating the accounts, assign one `admin` and each HR user in the SQL Editor (replace the example addresses):
 
 ```sql
-INSERT INTO public.user_roles (user_id, role)
+INSERT INTO public.users (user_id, role)
 SELECT id, 'admin' FROM auth.users WHERE email = 'admin@company.com'
 ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
 
-INSERT INTO public.user_roles (user_id, role)
+INSERT INTO public.users (user_id, role)
 SELECT id, 'hr' FROM auth.users WHERE email = 'hr@company.com'
 ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role;
 ```

@@ -1,9 +1,9 @@
-CREATE TABLE IF NOT EXISTS public.user_roles (
+CREATE TABLE IF NOT EXISTS public.users (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role TEXT NOT NULL CHECK (role IN ('admin', 'hr'))
 );
 
-ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION public.has_payroll_role(required_roles TEXT[])
 RETURNS BOOLEAN
@@ -14,7 +14,7 @@ SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1
-    FROM public.user_roles
+    FROM public.users
     WHERE user_id = auth.uid()
       AND role = ANY (required_roles)
   );
@@ -23,8 +23,8 @@ $$;
 REVOKE ALL ON FUNCTION public.has_payroll_role(TEXT[]) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.has_payroll_role(TEXT[]) TO authenticated;
 
-REVOKE ALL ON public.user_roles FROM anon, authenticated;
-GRANT SELECT ON public.user_roles TO authenticated;
+REVOKE ALL ON public.users FROM anon, authenticated;
+GRANT SELECT ON public.users TO authenticated;
 
 DO $$
 DECLARE
@@ -34,15 +34,15 @@ BEGIN
     SELECT policyname
     FROM pg_policies
     WHERE schemaname = 'public'
-      AND tablename = 'user_roles'
+      AND tablename = 'users'
   LOOP
-    EXECUTE format('DROP POLICY %I ON public.user_roles', policy_record.policyname);
+    EXECUTE format('DROP POLICY %I ON public.users', policy_record.policyname);
   END LOOP;
 END
 $$;
 
-CREATE POLICY "user_roles_select_self_or_admin"
-  ON public.user_roles
+CREATE POLICY "users_select_self_or_admin"
+  ON public.users
   FOR SELECT
   TO authenticated
   USING (user_id = auth.uid() OR public.has_payroll_role(ARRAY['admin']));
