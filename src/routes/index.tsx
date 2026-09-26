@@ -12,6 +12,7 @@ import {
   Banknote,
   AlertTriangle,
   Home,
+  KeyRound,
   LogOut,
   Plus,
   ReceiptText,
@@ -183,6 +184,7 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
   const [mode, setMode] = useState<ModalMode>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [toast, setToast] = useState<{ msg: string; tone: "ok" | "warn" } | null>(null);
+  const [registeringPasskey, setRegisteringPasskey] = useState(false);
 
   const employeesQuery = useEmployees();
   const batchesQuery = useBatches();
@@ -199,6 +201,25 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
   const advances: AdvanceTx[] = advancesQuery.data ?? [];
 
   const notify = (msg: string, tone: "ok" | "warn" = "ok") => setToast({ msg, tone });
+
+  const addPasskey = async () => {
+    setRegisteringPasskey(true);
+    try {
+      const { error } = await db.auth.registerPasskey();
+      if (error) {
+        notify(`Could not add passkey: ${error.message}`, "warn");
+      } else {
+        notify("Passkey added. You can now use it to sign in.");
+      }
+    } catch (error) {
+      notify(
+        `Could not add passkey: ${error instanceof Error ? error.message : "Please try again."}`,
+        "warn",
+      );
+    } finally {
+      setRegisteringPasskey(false);
+    }
+  };
 
   useEffect(() => {
     if (!toast) return;
@@ -283,8 +304,18 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
             </p>
           </div>
           <button
+            onClick={() => void addPasskey()}
+            disabled={registeringPasskey}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-navy hover:bg-navy-soft disabled:cursor-wait disabled:opacity-60"
+            aria-label="Add passkey"
+            title="Add passkey"
+          >
+            <KeyRound size={15} />
+            <span className="max-sm:hidden">{registeringPasskey ? "Adding…" : "Add passkey"}</span>
+          </button>
+          <button
             onClick={() => void db.auth.signOut()}
-            className="ml-auto inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-navy hover:bg-navy-soft sm:ml-3"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-card px-3 text-xs font-semibold text-navy hover:bg-navy-soft sm:ml-3"
             aria-label="Sign out"
             title="Sign out"
           >
