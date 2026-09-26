@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Download,
+  Eye,
   FileSpreadsheet,
   HardHat,
   Lock,
@@ -350,6 +351,7 @@ export function PayrollTab({
 }: Props) {
   const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
+  const [viewingBatch, setViewingBatch] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [isImporting, setIsImporting] = useState(false);
@@ -1047,6 +1049,126 @@ export function PayrollTab({
         )}
       </Dialog>
 
+      <Dialog
+        open={Boolean(viewingBatch)}
+        onOpenChange={(open) => {
+          if (!open) setViewingBatch(null);
+        }}
+      >
+        {viewingBatch && (
+          <DialogContent className="max-h-[90vh] w-[96vw] max-w-5xl overflow-y-auto sm:rounded-2xl">
+            <DialogHeader className="pr-8 text-left">
+              <DialogTitle className="font-display text-xl font-extrabold text-navy">
+                {viewingBatch.site || "Unnamed site"}
+              </DialogTitle>
+              <DialogDescription>
+                {monthLabel(viewingBatch.month)} · Foreman {viewingBatch.foreman || "—"} ·{" "}
+                {viewingBatch.lines.length} employee(s)
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {[
+                {
+                  label: "Gross",
+                  value: viewingBatch.lines.reduce((sum, line) => sum + lineGross(line), 0),
+                },
+                {
+                  label: "Net payroll",
+                  value: viewingBatch.lines.reduce((sum, line) => sum + toNum(line.net_salary), 0),
+                },
+                {
+                  label: "Paid",
+                  value: viewingBatch.lines.reduce((sum, line) => sum + toNum(line.paid), 0),
+                },
+                {
+                  label: "Balance",
+                  value: viewingBatch.lines.reduce(
+                    (sum, line) => sum + toNum(line.net_salary) - toNum(line.paid),
+                    0,
+                  ),
+                },
+              ].map((total) => (
+                <div key={total.label} className="rounded-xl bg-navy-soft/70 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {total.label}
+                  </p>
+                  <p className="mt-1 font-display text-lg font-extrabold text-navy">
+                    {fmt(total.value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="max-h-[52vh] overflow-auto rounded-xl border border-border">
+              <table className="w-full min-w-[900px] text-left text-xs">
+                <thead className="sticky top-0 bg-navy-soft text-[10px] uppercase tracking-wide text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2.5">Employee</th>
+                    <th className="px-3 py-2.5">Foreman</th>
+                    <th className="px-3 py-2.5 text-right">Hours</th>
+                    <th className="px-3 py-2.5 text-right">Rate</th>
+                    <th className="px-3 py-2.5 text-right">Gross</th>
+                    <th className="px-3 py-2.5 text-right">Food</th>
+                    <th className="px-3 py-2.5 text-right">Prev. advance</th>
+                    <th className="px-3 py-2.5 text-right">New advance</th>
+                    <th className="px-3 py-2.5 text-right">Other deduction</th>
+                    <th className="px-3 py-2.5 text-right">Net</th>
+                    <th className="px-3 py-2.5 text-right">Paid</th>
+                    <th className="px-3 py-2.5 text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewingBatch.lines.map((line, index) => {
+                    const employee = employees.find(
+                      (item) => String(item.id) === String(line.employee_id),
+                    );
+                    return (
+                      <tr
+                        key={line.id ?? `${line.employee_id}-${index}`}
+                        className="border-t border-border"
+                      >
+                        <td className="px-3 py-2.5">
+                          <p className="font-semibold text-navy">
+                            {employee?.name ?? "Unknown employee"}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-muted-foreground">
+                            {employee?.trade ?? "—"} · ID {empIdLabel(employees, line.employee_id)}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {line.foreman || viewingBatch.foreman || "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">{fmt(toNum(line.hours))}</td>
+                        <td className="px-3 py-2.5 text-right">{fmt(toNum(line.rate))}</td>
+                        <td className="px-3 py-2.5 text-right font-medium">
+                          {fmt(lineGross(line))}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          {fmt(toNum(line.food_deduction))}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">{fmt(toNum(line.prev_advance))}</td>
+                        <td className="px-3 py-2.5 text-right">{fmt(toNum(line.new_advance))}</td>
+                        <td className="px-3 py-2.5 text-right">
+                          {fmt(toNum(line.other_deduction))}
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-bold text-money">
+                          {fmt(toNum(line.net_salary))}
+                        </td>
+                        <td className="px-3 py-2.5 text-right">{fmt(toNum(line.paid))}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold">
+                          {fmt(toNum(line.net_salary) - toNum(line.paid))}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
+
       <div className="space-y-3">
         {monthBatches.length === 0 && !draft && (
           <div className={card + " p-8 text-center text-sm text-slate-400"}>
@@ -1073,6 +1195,14 @@ export function PayrollTab({
                   {fmt(net)} / {fmt(paid)}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setViewingBatch(b)}
+                className={btnOutline}
+                aria-label={`View ${b.site || "payroll batch"} details`}
+              >
+                <Eye size={14} /> View
+              </button>
               <button onClick={() => startEdit(b)} className={btnPrimary}>
                 <Pencil size={14} /> Edit
               </button>

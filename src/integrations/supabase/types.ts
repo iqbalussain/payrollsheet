@@ -149,6 +149,42 @@ export type Database = {
           },
         ];
       };
+      audit_logs: {
+        Row: {
+          actor_email: string | null;
+          actor_id: string | null;
+          changed_at: string;
+          id: string;
+          new_data: Json | null;
+          old_data: Json | null;
+          operation: string;
+          record_id: string | null;
+          table_name: string;
+        };
+        Insert: {
+          actor_email?: string | null;
+          actor_id?: string | null;
+          changed_at?: string;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          operation: string;
+          record_id?: string | null;
+          table_name: string;
+        };
+        Update: {
+          actor_email?: string | null;
+          actor_id?: string | null;
+          changed_at?: string;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          operation?: string;
+          record_id?: string | null;
+          table_name?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

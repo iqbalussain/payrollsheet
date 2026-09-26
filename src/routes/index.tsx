@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   BarChart2,
   CheckCircle2,
+  ClipboardList,
   FileDown,
   HardHat,
   History,
@@ -26,6 +27,7 @@ import { HistoryTab } from "@/components/payroll/HistoryTab";
 import { SlipsTab } from "@/components/payroll/SlipsTab";
 import { CostTab } from "@/components/payroll/CostTab";
 import { AdvancesTab } from "@/components/payroll/AdvancesTab";
+import { AuditHistoryTab } from "@/components/payroll/AuditHistoryTab";
 import {
   EmployeeModal,
   type EmployeeForm,
@@ -69,6 +71,7 @@ const TABS = [
   { id: "history", label: "Employee History", icon: History },
   { id: "slips", label: "Salary Slips", icon: FileDown },
   { id: "cost", label: "Cost Allocation", icon: BarChart2 },
+  { id: "audit", label: "Audit Log", icon: ClipboardList, adminOnly: true },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -264,12 +267,18 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
   };
 
   const error = employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error;
-  const mobileTabs: Array<{ id: TabId | "home"; label: string; icon: typeof Home }> = [
+  const mobileTabs: Array<{
+    id: TabId | "home";
+    label: string;
+    icon: typeof Home;
+    adminOnly?: boolean;
+  }> = [
     { id: "home", label: "Home", icon: Home },
     { id: "employees", label: "Employees", icon: Users },
     { id: "payroll", label: "Payroll", icon: Save },
     { id: "advances", label: "Advances", icon: Banknote },
     { id: "cost", label: "Costs", icon: BarChart2 },
+    { id: "audit", label: "Audit", icon: ClipboardList, adminOnly: true },
   ];
   const showHome = tab === "history" || tab === "slips";
 
@@ -328,37 +337,41 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
         </header>
 
         <nav className="mobile-desktop-tabs mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-                tab === id
-                  ? "bg-navy text-primary-foreground shadow-sm"
-                  : "text-slate-600 hover:bg-navy-soft hover:text-navy"
-              }`}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
+          {TABS.filter((item) => !("adminOnly" in item) || canDelete).map(
+            ({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                  tab === id
+                    ? "bg-navy text-primary-foreground shadow-sm"
+                    : "text-slate-600 hover:bg-navy-soft hover:text-navy"
+                }`}
+              >
+                <Icon size={14} />
+                {label}
+              </button>
+            ),
+          )}
         </nav>
 
         <nav className="mobile-bottom-tabs" aria-label="Primary navigation">
-          {mobileTabs.map(({ id, label, icon: Icon }) => {
-            const active = id === "home" ? showHome : tab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setTab(id === "home" ? "history" : id)}
-                aria-current={active ? "page" : undefined}
-                className={`mobile-bottom-tab ${active ? "is-active" : ""}`}
-              >
-                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-                <span>{label}</span>
-              </button>
-            );
-          })}
+          {mobileTabs
+            .filter((item) => !item.adminOnly || canDelete)
+            .map(({ id, label, icon: Icon }) => {
+              const active = id === "home" ? showHome : tab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setTab(id === "home" ? "history" : id)}
+                  aria-current={active ? "page" : undefined}
+                  className={`mobile-bottom-tab ${active ? "is-active" : ""}`}
+                >
+                  <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
         </nav>
 
         {error && (
@@ -469,6 +482,7 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
           )}
           {tab === "slips" && <SlipsTab employees={employees} batches={batches} notify={notify} />}
           {tab === "cost" && <CostTab batches={batches} employees={employees} notify={notify} />}
+          {tab === "audit" && canDelete && <AuditHistoryTab />}
         </main>
 
         {tab === "employees" && (
