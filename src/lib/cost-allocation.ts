@@ -11,10 +11,10 @@ export interface AllocationRow {
   hours: number;
   basic: number;
   foodDeduction: number;
+  previousAdvance: number;
   outstanding: number;
   total: number;
   allocated: number;
-  allocationPct: number;
   remaining: number;
 }
 
@@ -51,10 +51,10 @@ export function buildAllocationRows(
           hours,
           basic,
           foodDeduction: toNum(l.food_deduction),
+          previousAdvance: toNum(l.prev_advance),
           outstanding: Math.max(0, outstanding),
           total,
           allocated,
-          allocationPct: total > 0 ? (allocated / total) * 100 : 0,
           remaining: total - allocated,
         });
       });
@@ -69,6 +69,7 @@ export function allocationTotals(rows: AllocationRow[]) {
     hours: sum((r) => r.hours),
     basic: sum((r) => r.basic),
     foodDeduction: sum((r) => r.foodDeduction),
+    previousAdvance: sum((r) => r.previousAdvance),
     outstanding: sum((r) => r.outstanding),
     total: sum((r) => r.total),
     allocated: sum((r) => r.allocated),

@@ -47,11 +47,11 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
     ["Hrs", 12, "r"],
     ["Basic", 19, "r"],
     ["Food Deduct.", 20, "r"],
+    ["Prev. adv.", 20, "r"],
     ["Outstanding", 20, "r"],
     ["Total", 19, "r"],
     ["Allocated", 20, "r"],
-    ["%", 9, "r"],
-    ["Remaining", 20, "r"],
+    ["Remaining", 18, "r"],
   ];
 
   const drawHead = (y: number) => {
@@ -97,10 +97,10 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
       fmt(r.hours),
       fmt(r.basic),
       fmt(r.foodDeduction),
+      fmt(r.previousAdvance),
       fmt(r.outstanding),
       fmt(r.total),
       fmt(r.allocated),
-      `${r.allocationPct.toFixed(0)}%`,
       fmt(r.remaining),
     ];
     let x = L + 2;
@@ -128,7 +128,9 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.text(
-    `Total staff: ${t.staff}    Total hours: ${fmt(rows.reduce((sum, row) => sum + row.hours, 0))}    Total salary: ${fmt(
+    `Total staff: ${t.staff}    Total hours: ${fmt(rows.reduce((sum, row) => sum + row.hours, 0))}    Previous advance: ${fmt(
+      t.previousAdvance,
+    )} OMR    Total salary: ${fmt(
       t.total,
     )} OMR    Total allocated: ${fmt(t.allocated)} OMR    Remaining: ${fmt(t.remaining)} OMR`,
     L,

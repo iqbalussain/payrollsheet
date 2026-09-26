@@ -18,10 +18,10 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
     "Hrs",
     "Basic",
     "Food Deduct.",
+    "Prev. advance",
     "Outstanding",
     "Total",
     "Allocated",
-    "%",
     "Remaining",
   ];
   const lines = rows.map((r) =>
@@ -35,10 +35,10 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
       fmt(r.hours),
       fmt(r.basic),
       fmt(r.foodDeduction),
+      fmt(r.previousAdvance),
       fmt(r.outstanding),
       fmt(r.total),
       fmt(r.allocated),
-      `${r.allocationPct.toFixed(0)}%`,
       fmt(r.remaining),
     ]
       .map(escapeCsv)

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Download, FileSpreadsheet, Share2, Search, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Download, FileSpreadsheet, Search, Share2, Users, X } from "lucide-react";
 import { fmt, MONTHS, monthLabel, type Employee, type PayrollBatch } from "@/lib/payroll";
 import { allocationTotals, buildAllocationRows, type AllocationRow } from "@/lib/cost-allocation";
 import {
@@ -10,6 +10,13 @@ import {
 } from "@/lib/cost-pdf";
 import { downloadCostExcel } from "@/lib/cost-excel";
 import { btnGold, btnOutline, card, input, select } from "./ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -26,6 +33,10 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
   const [fSite, setFSite] = useState("");
   const [fForeman, setFForeman] = useState("");
   const [detail, setDetail] = useState<AllocationRow | null>(null);
+
+  useEffect(() => {
+    if (open) setFMonth(month);
+  }, [open, month]);
 
   const all = useMemo(() => buildAllocationRows(batches, employees), [batches, employees]);
 
@@ -50,9 +61,8 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
   const totals = useMemo(() => allocationTotals(rows), [rows]);
   const meta = { month: fMonth, site: fSite, foreman: fForeman };
 
-  if (!open) return null;
-
   const share = async () => {
+    if (!rows.length) return;
     const file = new File([costReportBlob(rows, meta)], costReportFilename(meta), {
       type: "application/pdf",
     });
@@ -78,25 +88,43 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-black/45 p-3 sm:p-6">
-      <div className={card + " w-full max-w-6xl"}>
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-          <h2 className="mr-auto text-base font-extrabold text-navy">Cost allocation details</h2>
-          <button onClick={() => downloadCostReport(rows, meta)} className={btnGold}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DialogContent className="flex max-h-[94vh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4 pr-12">
+          <DialogHeader className="mr-auto min-w-48 text-left">
+            <DialogTitle className="font-display text-xl font-extrabold text-navy">
+              Cost allocation
+            </DialogTitle>
+            <DialogDescription>
+              {rows.length.toLocaleString()} employee record(s)
+              {fMonth ? ` · ${monthLabel(fMonth)}` : " · All months"}
+            </DialogDescription>
+          </DialogHeader>
+          <button
+            onClick={() => downloadCostReport(rows, meta)}
+            disabled={!rows.length}
+            className={btnGold}
+          >
             <Download size={15} /> Download PDF
           </button>
-          <button onClick={() => downloadCostExcel(rows, meta)} className={btnOutline}>
+          <button
+            onClick={() => downloadCostExcel(rows, meta)}
+            disabled={!rows.length}
+            className={btnOutline}
+          >
             <FileSpreadsheet size={15} /> Download Excel
           </button>
-          <button onClick={share} className={btnOutline}>
+          <button onClick={() => void share()} disabled={!rows.length} className={btnOutline}>
             <Share2 size={15} /> Share
-          </button>
-          <button onClick={onClose} className={btnOutline} title="Close">
-            <X size={15} />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 border-b border-border px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 border-b border-border bg-canvas/60 px-4 py-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
             <Search
               size={14}
@@ -135,8 +163,30 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
           </select>
         </div>
 
-        <div className="max-h-[55vh] overflow-auto">
-          <table className="hidden w-full min-w-[1000px] text-xs md:table">
+        <div className="grid grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-4">
+          {[
+            { label: "Employees", value: String(totals.staff), icon: true },
+            { label: "Gross pay", value: `${fmt(totals.basic)} OMR` },
+            { label: "Net payroll", value: `${fmt(totals.total)} OMR` },
+            {
+              label: "Allocated / due",
+              value: `${fmt(totals.allocated)} / ${fmt(totals.remaining)}`,
+            },
+          ].map((metric) => (
+            <div key={metric.label} className="rounded-xl bg-navy-soft/70 px-3 py-2.5">
+              <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                {metric.icon && <Users size={12} />}
+                {metric.label}
+              </p>
+              <p className="mt-1 truncate font-display text-sm font-extrabold text-navy">
+                {metric.value}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[1320px] text-xs">
             <thead className="sticky top-0 z-10 bg-navy-soft">
               <tr className="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-3 py-2">Emp ID</th>
@@ -148,10 +198,10 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
                 <th className="px-3 py-2 text-right">Hrs</th>
                 <th className="px-3 py-2 text-right">Basic</th>
                 <th className="px-3 py-2 text-right">Food Deduct.</th>
+                <th className="px-3 py-2 text-right">Prev. advance</th>
                 <th className="px-3 py-2 text-right">Outstanding</th>
                 <th className="px-3 py-2 text-right">Total</th>
                 <th className="px-3 py-2 text-right">Allocated</th>
-                <th className="px-3 py-2 text-right">%</th>
                 <th className="px-3 py-2 text-right">Remaining</th>
               </tr>
             </thead>
@@ -180,10 +230,10 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
                     <td className="px-3 py-2 text-right">{fmt(r.hours)}</td>
                     <td className="px-3 py-2 text-right">{fmt(r.basic)}</td>
                     <td className="px-3 py-2 text-right text-danger">{fmt(r.foodDeduction)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(r.previousAdvance)}</td>
                     <td className="px-3 py-2 text-right text-warn">{fmt(r.outstanding)}</td>
                     <td className="px-3 py-2 text-right font-bold text-money">{fmt(r.total)}</td>
                     <td className="px-3 py-2 text-right">{fmt(r.allocated)}</td>
-                    <td className="px-3 py-2 text-right">{r.allocationPct.toFixed(0)}%</td>
                     <td className="px-3 py-2 text-right font-semibold">{fmt(r.remaining)}</td>
                   </tr>
                 ))
@@ -221,60 +271,61 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-4 border-t-2 border-slate-200 bg-navy-soft/60 px-4 py-3 text-xs font-bold text-navy">
+        <div className="flex flex-wrap gap-4 border-t border-border bg-navy-soft/60 px-4 py-3 text-xs font-bold text-navy">
           <span>Total staff: {totals.staff}</span>
           <span>Total hours: {fmt(totals.hours)}</span>
           <span>Total salary: {fmt(totals.total)} OMR</span>
+          <span>Previous advance: {fmt(totals.previousAdvance)} OMR</span>
           <span className="text-money">Total allocated: {fmt(totals.allocated)} OMR</span>
           <span>Remaining: {fmt(totals.remaining)} OMR</span>
         </div>
-      </div>
 
-      {detail && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setDetail(null)}
-        >
-          <div className={card + " w-full max-w-md p-5"} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-extrabold text-navy">{detail.name}</h3>
-                <p className="text-xs text-slate-500">
-                  {detail.trade} · ID {detail.employeeId}
-                </p>
-              </div>
-              <button onClick={() => setDetail(null)} className={btnOutline}>
-                <X size={15} />
-              </button>
-            </div>
-            <dl className="space-y-1 text-sm">
-              {(
-                [
-                  ["Site / project", detail.site],
-                  ["Foreman", detail.foreman],
-                  ["Month", monthLabel(detail.month)],
-                  ["Hours", fmt(detail.hours)],
-                  ["Basic salary", fmt(detail.basic)],
-                  ["Food deduction", fmt(detail.foodDeduction)],
-                  ["Outstanding advance", fmt(detail.outstanding)],
-                  ["Total salary", fmt(detail.total)],
-                  ["Allocated amount", fmt(detail.allocated)],
-                  ["Allocation %", `${detail.allocationPct.toFixed(0)}%`],
-                  ["Remaining amount", fmt(detail.remaining)],
-                ] as const
-              ).map(([k, v]) => (
-                <div
-                  key={k}
-                  className="flex justify-between border-b border-border py-1 last:border-0"
-                >
-                  <dt className="text-slate-500">{k}</dt>
-                  <dd className="font-semibold text-foreground">{v}</dd>
+        {detail && (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setDetail(null)}
+          >
+            <div className={card + " w-full max-w-md p-5"} onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-navy">{detail.name}</h3>
+                  <p className="text-xs text-slate-500">
+                    {detail.trade} · ID {detail.employeeId}
+                  </p>
                 </div>
-              ))}
-            </dl>
+                <button onClick={() => setDetail(null)} className={btnOutline}>
+                  <X size={15} />
+                </button>
+              </div>
+              <dl className="space-y-1 text-sm">
+                {(
+                  [
+                    ["Site / project", detail.site],
+                    ["Foreman", detail.foreman],
+                    ["Month", monthLabel(detail.month)],
+                    ["Hours", fmt(detail.hours)],
+                    ["Basic salary", fmt(detail.basic)],
+                    ["Food deduction", fmt(detail.foodDeduction)],
+                    ["Previous advance", fmt(detail.previousAdvance)],
+                    ["Outstanding advance", fmt(detail.outstanding)],
+                    ["Total salary", fmt(detail.total)],
+                    ["Allocated amount", fmt(detail.allocated)],
+                    ["Remaining amount", fmt(detail.remaining)],
+                  ] as const
+                ).map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="flex justify-between border-b border-border py-1 last:border-0"
+                  >
+                    <dt className="text-slate-500">{k}</dt>
+                    <dd className="font-semibold text-foreground">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
