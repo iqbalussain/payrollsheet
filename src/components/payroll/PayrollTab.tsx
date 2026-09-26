@@ -17,13 +17,14 @@ import {
   X,
 } from "lucide-react";
 import {
-  MONTHS,
   computeNet,
   fmt,
   advanceCarryForward,
+  currentPayrollMonth,
   lineGross,
   lockedEmployeeIds,
   monthLabel,
+  payrollMonthOptions,
   toNum,
   type AdvanceTx,
   type Employee,
@@ -62,17 +63,42 @@ interface EmployeeSearchProps {
 function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSearchProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const optionRefs = useRef(new Map<number, HTMLButtonElement>());
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const selectedButtonRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocus = useRef(false);
+  const [rect, setRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    position: "absolute" | "fixed";
+  } | null>(null);
   const selected = employees.find((e) => String(e.id) === String(value));
 
   useEffect(() => {
     if (!open) return;
     const place = () => {
       const r = boxRef.current?.getBoundingClientRect();
-      if (r) setRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 240) });
+      if (!r) return;
+      const dialog = boxRef.current?.closest<HTMLElement>('[role="dialog"]');
+      if (dialog) {
+        const dialogRect = dialog.getBoundingClientRect();
+        setRect({
+          top: r.bottom - dialogRect.top - dialog.clientTop + 4,
+          left: r.left - dialogRect.left - dialog.clientLeft,
+          width: Math.max(r.width, 240),
+          position: "absolute",
+        });
+      } else {
+        setRect({
+          top: r.bottom + 4,
+          left: r.left,
+          width: Math.max(r.width, 240),
+          position: "fixed",
+        });
+      }
     };
     place();
     window.addEventListener("scroll", place, true);
@@ -104,16 +130,38 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 
   useEffect(() => {
-    setHighlightedIndex(0);
+    setHighlightedIndex(-1);
   }, [query]);
 
   useEffect(() => {
     if (!open) return;
     const highlighted = selectableResults[highlightedIndex];
-    if (highlighted) {
-      optionRefs.current.get(highlighted.id)?.scrollIntoView({ block: "nearest" });
+    const listElement = listRef.current;
+    const optionElement = highlighted ? optionRefs.current.get(highlighted.id) : null;
+    if (listElement && optionElement) {
+      const listRect = listElement.getBoundingClientRect();
+      const optionRect = optionElement.getBoundingClientRect();
+      if (optionRect.top < listRect.top) {
+        listElement.scrollTop -= listRect.top - optionRect.top;
+      } else if (optionRect.bottom > listRect.bottom) {
+        listElement.scrollTop += optionRect.bottom - listRect.bottom;
+      }
     }
   }, [open, highlightedIndex, selectableResults]);
+
+  useEffect(() => {
+    if (restoreFocus.current && selected && !open) {
+      restoreFocus.current = false;
+      selectedButtonRef.current?.focus();
+    }
+  }, [open, selected]);
+
+  const chooseEmployee = (employeeId: number) => {
+    restoreFocus.current = true;
+    onPick(String(employeeId));
+    setOpen(false);
+    setQuery("");
+  };
 
   if (selected && !open) {
     return (
@@ -122,6 +170,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
           {selected.name} <span className="font-normal text-slate-400">— {selected.trade}</span>
         </span>
         <button
+          ref={selectedButtonRef}
           type="button"
           title="Change employee"
           onClick={() => {
@@ -138,8 +187,19 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
 
   const list = (
     <div
-      style={rect ? { top: rect.top, left: rect.left, width: rect.width } : undefined}
-      className="employee-picker-sheet fixed z-70 max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
+      ref={listRef}
+      onMouseDown={(event) => event.preventDefault()}
+      style={
+        rect
+          ? {
+              position: rect.position,
+              top: rect.top,
+              left: rect.left,
+              width: rect.width,
+            }
+          : undefined
+      }
+      className="employee-picker-sheet z-[70] max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
     >
       {results.length === 0 ? (
         <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
@@ -155,12 +215,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
                 else optionRefs.current.delete(e.id);
               }}
               disabled={isLocked}
-              onMouseDown={(ev) => {
-                ev.preventDefault();
-                onPick(String(e.id));
-                setOpen(false);
-                setQuery("");
-              }}
+              onClick={() => chooseEmployee(e.id)}
               className={`flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-navy-soft disabled:cursor-not-allowed disabled:opacity-45 ${
                 selectableResults[highlightedIndex]?.id === e.id ? "bg-navy-soft" : ""
               }`}
@@ -201,23 +256,29 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
             e.preventDefault();
             setOpen(true);
             setHighlightedIndex((index) =>
-              selectableResults.length ? (index + 1) % selectableResults.length : 0,
+              selectableResults.length
+                ? index < 0 || index >= selectableResults.length - 1
+                  ? 0
+                  : index + 1
+                : -1,
             );
           } else if (e.key === "ArrowUp") {
             e.preventDefault();
             setOpen(true);
             setHighlightedIndex((index) =>
               selectableResults.length
-                ? (index - 1 + selectableResults.length) % selectableResults.length
-                : 0,
+                ? index <= 0
+                  ? selectableResults.length - 1
+                  : index - 1
+                : -1,
             );
           } else if (e.key === "Enter") {
             e.preventDefault();
-            const employee = selectableResults[highlightedIndex];
+            const employee =
+              selectableResults[highlightedIndex] ??
+              (highlightedIndex === -1 ? selectableResults[0] : undefined);
             if (employee) {
-              onPick(String(employee.id));
-              setOpen(false);
-              setQuery("");
+              chooseEmployee(employee.id);
             }
           } else if (e.key === "Escape") {
             setOpen(false);
@@ -226,7 +287,12 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
         placeholder="Search name, trade or ID…"
         className={inputSm + " w-full pl-7"}
       />
-      {open && typeof document !== "undefined" && createPortal(list, document.body)}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          list,
+          boxRef.current?.closest<HTMLElement>('[role="dialog"]') ?? document.body,
+        )}
     </div>
   );
 }
@@ -349,7 +415,7 @@ export function PayrollTab({
   notify,
   onNewEmployee,
 }: Props) {
-  const [month, setMonth] = useState(MONTHS[0]!);
+  const [month, setMonth] = useState(currentPayrollMonth);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
   const [viewingBatch, setViewingBatch] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
@@ -617,7 +683,7 @@ export function PayrollTab({
             onChange={(e) => setMonth(e.target.value)}
             className={select + " sm:w-64"}
           >
-            {MONTHS.map((m) => (
+            {payrollMonthOptions().map((m) => (
               <option key={m} value={m}>
                 {monthLabel(m)}
               </option>

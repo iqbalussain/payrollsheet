@@ -9,13 +9,14 @@ import {
   Search,
 } from "lucide-react";
 import {
-  MONTHS,
+  currentPayrollMonth,
   employeeRows,
   fmt,
   getCarryForward,
   lineBalance,
   monthLabel,
   outstandingAdvance,
+  payrollMonthOptions,
   toNum,
   type Employee,
   type PayrollBatch,
@@ -33,7 +34,7 @@ type SortKey = "employee" | "trade" | "foreman";
 type SortDirection = "asc" | "desc";
 
 export function SlipsTab({ employees, batches, notify }: Props) {
-  const [month, setMonth] = useState(MONTHS[0]!);
+  const [month, setMonth] = useState(currentPayrollMonth);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("employee");
@@ -164,7 +165,7 @@ export function SlipsTab({ employees, batches, notify }: Props) {
             }}
             className={select}
           >
-            {MONTHS.map((m) => (
+            {payrollMonthOptions().map((m) => (
               <option key={m} value={m}>
                 {monthLabel(m)}
               </option>

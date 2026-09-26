@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { ChevronRight, List, MapPin, Users } from "lucide-react";
-import { fmt, MONTHS, monthLabel, toNum, type Employee, type PayrollBatch } from "@/lib/payroll";
+import {
+  currentPayrollMonth,
+  fmt,
+  monthLabel,
+  payrollMonthOptions,
+  toNum,
+  type Employee,
+  type PayrollBatch,
+} from "@/lib/payroll";
 import { btnGold, card, select } from "./ui";
 import { CostDetailsModal } from "./CostDetailsModal";
 
@@ -14,7 +22,7 @@ interface Props {
 
 export function CostTab({ batches, employees, notify }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>("site");
-  const [filterMonth, setFilterMonth] = useState("");
+  const [filterMonth, setFilterMonth] = useState(currentPayrollMonth);
   const [listOpen, setListOpen] = useState(false);
 
   const costRows = useMemo(() => {
@@ -77,7 +85,7 @@ export function CostTab({ batches, employees, notify }: Props) {
           className={select + " sm:w-56"}
         >
           <option value="">All months</option>
-          {MONTHS.map((m) => (
+          {payrollMonthOptions().map((m) => (
             <option key={m} value={m}>
               {monthLabel(m)}
             </option>

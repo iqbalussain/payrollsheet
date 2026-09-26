@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet, Search, Share2, Users, X } from "lucide-react";
-import { fmt, MONTHS, monthLabel, type Employee, type PayrollBatch } from "@/lib/payroll";
+import {
+  fmt,
+  monthLabel,
+  payrollMonthOptions,
+  type Employee,
+  type PayrollBatch,
+} from "@/lib/payroll";
 import { allocationTotals, buildAllocationRows, type AllocationRow } from "@/lib/cost-allocation";
 import {
   COMPANY_NAME,
@@ -139,7 +145,7 @@ export function CostDetailsModal({ open, onClose, batches, employees, month = ""
           </div>
           <select value={fMonth} onChange={(e) => setFMonth(e.target.value)} className={select}>
             <option value="">All months</option>
-            {MONTHS.map((m) => (
+            {payrollMonthOptions().map((m) => (
               <option key={m} value={m}>
                 {monthLabel(m)}
               </option>

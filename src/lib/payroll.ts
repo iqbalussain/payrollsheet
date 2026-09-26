@@ -49,6 +49,15 @@ export const MONTHS = [
   "2027-01", "2027-02", "2027-03", "2027-04", "2027-05", "2027-06",
 ];
 
+export function currentPayrollMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function payrollMonthOptions() {
+  return [...new Set([...MONTHS, currentPayrollMonth()])].sort();
+}
+
 export function monthLabel(m: string) {
   if (!m) return "";
   const [y, mo] = m.split("-");
