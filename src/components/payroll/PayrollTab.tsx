@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { UserPlus } from "lucide-react";
-import { HardHat, Plus, Save, Trash2, X, Lock, Pencil, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  Download,
+  FileSpreadsheet,
+  HardHat,
+  Lock,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  Trash2,
+  Upload,
+  UserPlus,
+  X,
+} from "lucide-react";
 import {
   MONTHS,
   computeNet,
@@ -16,13 +29,21 @@ import {
   type PayrollBatch,
   type PayrollLine,
 } from "@/lib/payroll";
+import { downloadPayrollImportTemplate, readPayrollImport } from "@/lib/payroll-excel";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { btnGold, btnIcon, btnOutline, btnPrimary, card, input, inputSm, select } from "./ui";
 
 interface Props {
   employees: Employee[];
   batches: PayrollBatch[];
   advances: AdvanceTx[];
-  onSave: (batch: PayrollBatch) => void;
+  onSave: (batch: PayrollBatch) => Promise<void>;
   onDelete: (id: string) => void;
   canDelete: boolean;
   saving: boolean;
@@ -95,7 +116,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
 
   if (selected && !open) {
     return (
-      <div className="flex min-w-[190px] items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs">
+      <div className="flex min-w-47.5 items-center justify-between gap-1 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-xs">
         <span className="font-semibold text-navy">
           {selected.name} <span className="font-normal text-slate-400">— {selected.trade}</span>
         </span>
@@ -117,7 +138,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   const list = (
     <div
       style={rect ? { top: rect.top, left: rect.left, width: rect.width } : undefined}
-      className="employee-picker-sheet fixed z-[70] max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
+      className="employee-picker-sheet fixed z-70 max-h-64 overflow-auto rounded-md border border-border bg-card shadow-xl"
     >
       {results.length === 0 ? (
         <p className="px-3 py-2 text-[11px] text-slate-400">No matching employee.</p>
@@ -160,7 +181,7 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 
   return (
-    <div ref={boxRef} className="relative min-w-[190px]">
+    <div ref={boxRef} className="relative min-w-47.5">
       <Search
         size={13}
         className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
@@ -209,34 +230,6 @@ function EmployeeSearchSelect({ employees, locked, value, onPick }: EmployeeSear
   );
 }
 
-function SlideToSave({ onSave, saving }: { onSave: () => void; saving: boolean }) {
-  const [v, setV] = useState(0);
-  return (
-    <div className="sticky bottom-2 rounded-xl border border-gold/50 bg-gold/10 p-2">
-      <input
-        type="range"
-        min={0}
-        max={100}
-        value={v}
-        disabled={saving}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (n > 92) {
-            setV(0);
-            onSave();
-          } else setV(n);
-        }}
-        onPointerUp={() => setV(0)}
-        className="h-9 w-full cursor-grab accent-teal"
-        aria-label="Slide to save payroll batch"
-      />
-      <p className="text-center text-[11px] font-bold uppercase tracking-wide text-gold-dark">
-        {saving ? "Saving…" : "Slide right to save batch"}
-      </p>
-    </div>
-  );
-}
-
 function empIdLabel(employees: Employee[], id: number | "") {
   if (id === "") return "—";
   const e = employees.find((x) => String(x.id) === String(id));
@@ -256,6 +249,94 @@ const emptyLine = (): PayrollLine => ({
   paid: "",
 });
 
+const numericFields = [
+  ["hours", "Hours", true],
+  ["rate", "Rate", true],
+  ["food_deduction", "Food deduction", false],
+  ["prev_advance", "Previous advance", false],
+  ["new_advance", "New advance", false],
+  ["other_deduction", "Other deduction", false],
+  ["paid", "Paid", false],
+] as const;
+
+function lineHasValues(line: PayrollLine) {
+  return (
+    Boolean(line.foreman.trim()) ||
+    numericFields.some(([field]) => String(line[field] ?? "").trim() !== "")
+  );
+}
+
+function validateBatch(
+  draft: PayrollBatch,
+  month: string,
+  employees: Employee[],
+  batches: PayrollBatch[],
+  advances: AdvanceTx[],
+  locked: Set<string>,
+) {
+  const errors: string[] = [];
+  if (!month || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+    errors.push("Select a valid payroll month.");
+  }
+  if (!draft.site.trim()) errors.push("Enter a site or project name.");
+
+  const selectedIds = new Set<string>();
+  let selectedCount = 0;
+  draft.lines.forEach((line, index) => {
+    const row = index + 1;
+    if (line.employee_id === "") {
+      if (lineHasValues(line)) errors.push(`Line ${row}: choose an employee or remove this line.`);
+      return;
+    }
+
+    selectedCount += 1;
+    const employeeId = String(line.employee_id);
+    const employee = employees.find((item) => String(item.id) === employeeId);
+    if (!employee) errors.push(`Line ${row}: the selected employee no longer exists.`);
+    if (selectedIds.has(employeeId)) {
+      errors.push(`Line ${row}: this employee is listed more than once.`);
+    }
+    selectedIds.add(employeeId);
+    if (locked.has(employeeId)) {
+      errors.push(
+        `Line ${row}: this employee is already in another batch for ${monthLabel(month)}.`,
+      );
+    }
+
+    numericFields.forEach(([field, label, required]) => {
+      const raw = String(line[field] ?? "").trim();
+      if (!raw) {
+        if (required) errors.push(`Line ${row}: enter ${label.toLowerCase()}.`);
+        return;
+      }
+      const amount = Number(raw);
+      if (!Number.isFinite(amount)) {
+        errors.push(`Line ${row}: ${label.toLowerCase()} must be a valid number.`);
+      } else if (amount < 0) {
+        errors.push(`Line ${row}: ${label.toLowerCase()} cannot be negative.`);
+      }
+    });
+
+    const gross = lineGross(line);
+    const deductions =
+      toNum(line.food_deduction) + toNum(line.prev_advance) + toNum(line.other_deduction);
+    if (deductions > gross + 0.001) errors.push(`Line ${row}: deductions exceed gross pay.`);
+    if (toNum(line.paid) > toNum(line.net_salary) + 0.001) {
+      errors.push(`Line ${row}: paid amount exceeds net salary.`);
+    }
+    if (employee) {
+      const availableAdvance =
+        advanceCarryForward(employee.id, month, batches, advances) + toNum(line.new_advance);
+      if (toNum(line.prev_advance) > availableAdvance + 0.001) {
+        errors.push(`Line ${row}: previous advance deduction exceeds the outstanding advance.`);
+      }
+    }
+  });
+
+  if (!selectedCount) errors.push("Add at least one employee before saving.");
+  return errors;
+}
+
 export function PayrollTab({
   employees,
   batches,
@@ -270,6 +351,10 @@ export function PayrollTab({
   const [month, setMonth] = useState(MONTHS[0]!);
   const [draft, setDraft] = useState<PayrollBatch | null>(null);
   const [foremanLine, setForemanLine] = useState<number | null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const monthBatches = useMemo(() => batches.filter((b) => b.month === month), [batches, month]);
 
@@ -293,7 +378,175 @@ export function PayrollTab({
     setForemanLine(null);
   }, [month]);
 
-  const startNew = () => setDraft({ id: "", month, site: "", foreman: "", lines: [emptyLine()] });
+  const startNew = () => {
+    setImportErrors([]);
+    setSubmitError("");
+    setDraft({ id: "", month, site: "", foreman: "", lines: [emptyLine()] });
+  };
+
+  const startEdit = (batch: PayrollBatch) => {
+    setImportErrors([]);
+    setSubmitError("");
+    setDraft(batch);
+  };
+
+  const closeEditor = () => {
+    if (saving || isImporting) return;
+    setDraft(null);
+    setImportErrors([]);
+    setSubmitError("");
+  };
+
+  const validationErrors = useMemo(
+    () => (draft ? validateBatch(draft, month, employees, batches, advances, locked) : []),
+    [draft, month, employees, batches, advances, locked],
+  );
+
+  const importFile = async (file: File) => {
+    setIsImporting(true);
+    setImportErrors([]);
+    setSubmitError("");
+    try {
+      const rows = await readPayrollImport(file);
+      if (!rows.length) throw new Error("The file does not contain any payroll rows.");
+
+      const issues: string[] = [];
+      const imported: PayrollLine[] = [];
+      const employeeIds = new Set(
+        (draft?.lines ?? [])
+          .filter((line) => line.employee_id !== "")
+          .map((line) => String(line.employee_id)),
+      );
+
+      rows.forEach(({ rowNumber, values }) => {
+        const databaseId =
+          values["databaseid"] || values["internalid"] || values["employeeinternalid"];
+        const empId =
+          values["employeeid"] ||
+          values["empid"] ||
+          values["employeenumber"] ||
+          values["employeeno"] ||
+          values["idnumber"];
+        const name = values["employee"] || values["name"] || values["employeename"];
+        const selectors = [
+          databaseId ? employees.filter((employee) => String(employee.id) === databaseId) : null,
+          empId
+            ? employees.filter(
+                (employee) => employee.id_number.trim().toLowerCase() === empId.toLowerCase(),
+              )
+            : null,
+          name
+            ? employees.filter(
+                (employee) => employee.name.trim().toLowerCase() === name.toLowerCase(),
+              )
+            : null,
+        ].filter((matches): matches is Employee[] => matches !== null);
+        let matchedEmployees = selectors[0] ?? [];
+        for (const matches of selectors.slice(1)) {
+          const matchingIds = new Set(matches.map((employee) => employee.id));
+          matchedEmployees = matchedEmployees.filter((employee) => matchingIds.has(employee.id));
+        }
+        if (!selectors.length || matchedEmployees.length !== 1) {
+          issues.push(
+            `Row ${rowNumber}: ${
+              matchedEmployees.length > 1
+                ? "employee ID and name point to different or duplicate employees."
+                : "employee was not found. Use Employee ID, Emp ID, or an exact employee name."
+            }`,
+          );
+          return;
+        }
+
+        const employee = matchedEmployees[0]!;
+        if (locked.has(String(employee.id))) {
+          issues.push(`Row ${rowNumber}: ${employee.name} is already in another batch this month.`);
+          return;
+        }
+        if (employeeIds.has(String(employee.id))) {
+          issues.push(`Row ${rowNumber}: ${employee.name} appears more than once in this batch.`);
+          return;
+        }
+
+        const issuesBeforeNumbers = issues.length;
+        const readNumber = (label: string, keys: string[], required = false) => {
+          const raw = keys.map((key) => values[key]).find((value) => value !== undefined) ?? "";
+          if (!raw.trim()) {
+            if (required) issues.push(`Row ${rowNumber}: ${label} is required.`);
+            return 0;
+          }
+          const parsed = Number(raw);
+          if (!Number.isFinite(parsed) || parsed < 0) {
+            issues.push(`Row ${rowNumber}: ${label} must be a valid non-negative number.`);
+            return 0;
+          }
+          return parsed;
+        };
+
+        const hours = readNumber("Hours", ["hours"], true);
+        const rate = readNumber("Rate", ["rate"]);
+        const food = readNumber("Food deduction", ["fooddeduction", "food", "fooddeduct"]);
+        const previousAdvance = readNumber("Previous advance", [
+          "previousadvance",
+          "prevadvance",
+          "prevadv",
+        ]);
+        const newAdvance = readNumber("New advance", ["newadvance", "newadv"]);
+        const otherDeduction = readNumber("Other deduction", ["otherdeduction", "otherdeduct"]);
+        const paid = readNumber("Paid", ["paid"]);
+        if (issues.length > issuesBeforeNumbers) return;
+
+        const line: PayrollLine = {
+          employee_id: employee.id,
+          foreman: values["foreman"] || draft?.foreman || "",
+          hours,
+          rate: values["rate"]?.trim() ? rate : employee.hourly_rate,
+          food_deduction: food,
+          prev_advance:
+            values["previousadvance"] || values["prevadvance"] || values["prevadv"]
+              ? previousAdvance
+              : advanceCarryForward(employee.id, month, batches, advances),
+          new_advance: newAdvance,
+          other_deduction: otherDeduction,
+          net_salary: 0,
+          paid,
+        };
+        line.net_salary = computeNet(line);
+        imported.push(line);
+        employeeIds.add(String(employee.id));
+      });
+
+      if (issues.length) {
+        setImportErrors(issues);
+        return;
+      }
+      if (!imported.length) {
+        setImportErrors(["The file did not contain any usable employee rows."]);
+        return;
+      }
+
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              lines: [
+                ...current.lines.filter((line) => line.employee_id !== "" || lineHasValues(line)),
+                ...imported,
+              ],
+            }
+          : current,
+      );
+      notify(`${imported.length} employee row(s) imported.`);
+    } catch (error) {
+      setImportErrors([
+        error instanceof Error
+          ? error.message
+          : "Could not read this file. Check it and try again.",
+      ]);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsImporting(false);
+    }
+  };
 
   const setLine = (idx: number, patch: Partial<PayrollLine>) => {
     setDraft((d) => {
@@ -337,28 +590,17 @@ export function PayrollTab({
       )
     : null;
 
-  const save = () => {
+  const save = async () => {
     if (!draft) return;
-    if (!draft.lines.some((l) => l.employee_id)) {
-      notify("Add at least one employee before saving.", "warn");
-      return;
+    if (isImporting || validationErrors.length || importErrors.length) return;
+    setSubmitError("");
+    try {
+      await onSave({ ...draft, month });
+      setDraft(null);
+      setImportErrors([]);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not save payroll batch.");
     }
-    const over = draft.lines.find((l) => {
-      if (!l.employee_id) return false;
-      const avail =
-        advanceCarryForward(l.employee_id, month, batches, advances) + toNum(l.new_advance);
-      return toNum(l.prev_advance) > avail + 0.001;
-    });
-    if (over) {
-      const emp = employees.find((e) => String(e.id) === String(over.employee_id));
-      notify(
-        `Advance deduction for ${emp?.name ?? "employee"} exceeds their outstanding advance.`,
-        "warn",
-      );
-      return;
-    }
-    onSave({ ...draft, month });
-    setDraft(null);
   };
 
   return (
@@ -393,322 +635,417 @@ export function PayrollTab({
         </p>
       )}
 
-      {draft && (
-        <div className={card + " overflow-visible"}>
-          <div className="mobile-payroll-sticky sticky top-0 z-30 flex flex-wrap items-end gap-3 rounded-t-xl border-b border-border bg-navy-soft px-4 py-3">
-            <div className="min-w-[160px] flex-1">
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                Site
-              </label>
-              <input
-                value={draft.site}
-                onChange={(e) => setDraft({ ...draft, site: e.target.value })}
-                placeholder="Site / project"
-                className={input}
-              />
-            </div>
-            <div className="min-w-[160px] flex-1">
-              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                Batch foreman (default)
-              </label>
-              <input
-                value={draft.foreman}
-                onChange={(e) => setDraft({ ...draft, foreman: e.target.value })}
-                placeholder="Foreman name"
-                list="foreman-options"
-                className={input}
-              />
-            </div>
-            <button onClick={save} disabled={saving} className={btnGold}>
-              <Save size={15} /> {saving ? "Saving…" : "Save batch"}
-            </button>
-            <button onClick={() => setDraft(null)} className={btnOutline}>
-              <X size={15} /> Cancel
-            </button>
-          </div>
+      <Dialog
+        open={Boolean(draft)}
+        onOpenChange={(open) => {
+          if (!open) closeEditor();
+        }}
+      >
+        {draft && (
+          <DialogContent className="flex h-[94vh] max-h-[94vh] w-[98vw] max-w-[98vw] flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
+            <DialogHeader className="border-b border-border px-5 py-4 pr-12 text-left">
+              <DialogTitle className="font-display text-xl font-extrabold text-navy">
+                {draft.id ? "Edit payroll batch" : "Create payroll batch"}
+              </DialogTitle>
+              <DialogDescription>
+                Review employee amounts and resolve any flagged issues before saving.
+              </DialogDescription>
+            </DialogHeader>
 
-          <datalist id="foreman-options">
-            {foremen.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
+            <div className="flex flex-wrap items-end gap-3 border-b border-border bg-navy-soft px-4 py-3">
+              <div className="min-w-40 flex-1">
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Site
+                </label>
+                <input
+                  value={draft.site}
+                  onChange={(e) => setDraft({ ...draft, site: e.target.value })}
+                  placeholder="Site / project"
+                  className={input}
+                />
+              </div>
+              <div className="min-w-40 flex-1">
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Batch foreman (default)
+                </label>
+                <input
+                  value={draft.foreman}
+                  onChange={(e) => setDraft({ ...draft, foreman: e.target.value })}
+                  placeholder="Foreman name"
+                  list="foreman-options"
+                  className={input}
+                />
+              </div>
+            </div>
 
-          <div className="hidden overflow-x-auto md:block xl:overflow-x-visible">
-            <table className="w-full min-w-[1080px] text-xs">
-              <thead className="sticky top-[76px] z-20 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
-                <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  <th className="px-3 py-2">Employee</th>
-                  <th className="px-2 py-2">Emp ID</th>
-                  <th className="px-2 py-2">Foreman</th>
-                  <th className="px-2 py-2 text-right">Hours</th>
-                  <th className="px-2 py-2 text-right">Rate</th>
-                  <th className="px-2 py-2 text-right">Gross</th>
-                  <th className="px-2 py-2 text-right">Food</th>
-                  <th className="px-2 py-2 text-right">Prev adv.</th>
-                  <th className="px-2 py-2 text-right">New adv.</th>
-                  <th className="px-2 py-2 text-right">Other ded.</th>
-                  <th className="px-2 py-2 text-right">Net</th>
-                  <th className="px-2 py-2 text-right">Paid</th>
-                  <th className="px-2 py-2 text-right">Balance</th>
-                  <th className="px-2 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {draft.lines.map((l, idx) => {
-                  const carry = l.employee_id
-                    ? advanceCarryForward(l.employee_id, month, batches, advances)
-                    : 0;
-                  return (
-                    <tr key={idx} className="border-b border-border align-top last:border-0">
-                      <td className="px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.csv"
+                className="sr-only"
+                aria-label="Choose an Excel workbook or CSV file"
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) void importFile(file);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting || saving}
+                className={btnOutline}
+              >
+                <Upload size={15} /> {isImporting ? "Checking file…" : "Import Excel / CSV"}
+              </button>
+              <button type="button" onClick={downloadPayrollImportTemplate} className={btnOutline}>
+                <Download size={15} /> Download template
+              </button>
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <FileSpreadsheet size={14} />
+                Imports append checked rows from the first worksheet. Excel IDs must match employee
+                records.
+              </p>
+            </div>
+
+            {(validationErrors.length > 0 || importErrors.length > 0 || submitError) && (
+              <div className="mx-4 mt-3 max-h-32 overflow-y-auto rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">
+                <p className="mb-1 flex items-center gap-2 font-bold">
+                  <AlertTriangle size={16} />
+                  {importErrors.length
+                    ? `${importErrors.length} spreadsheet issue(s) need attention`
+                    : submitError
+                      ? "The batch could not be saved"
+                      : `${validationErrors.length} issue(s) to fix before saving`}
+                </p>
+                <ul className="list-inside list-disc space-y-0.5 text-xs">
+                  {submitError && <li>{submitError}</li>}
+                  {importErrors.map((error, index) => (
+                    <li key={`import-${index}`}>{error}</li>
+                  ))}
+                  {validationErrors.map((error, index) => (
+                    <li key={`validation-${index}`}>{error}</li>
+                  ))}
+                </ul>
+                {importErrors.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setImportErrors([])}
+                    className="mt-2 text-xs font-bold underline underline-offset-2"
+                  >
+                    Dismiss import issues
+                  </button>
+                )}
+              </div>
+            )}
+
+            <datalist id="foreman-options">
+              {foremen.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+
+            <div className="min-h-0 flex-1 overflow-auto px-2 py-3 sm:px-4">
+              <div className="hidden overflow-x-auto md:block xl:overflow-x-visible">
+                <table className="w-full min-w-270 text-xs">
+                  <thead className="bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+                    <tr className="border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      <th className="px-3 py-2">Employee</th>
+                      <th className="px-2 py-2">Emp ID</th>
+                      <th className="px-2 py-2">Foreman</th>
+                      <th className="px-2 py-2 text-right">Hours</th>
+                      <th className="px-2 py-2 text-right">Rate</th>
+                      <th className="px-2 py-2 text-right">Gross</th>
+                      <th className="px-2 py-2 text-right">Food</th>
+                      <th className="px-2 py-2 text-right">Prev adv.</th>
+                      <th className="px-2 py-2 text-right">New adv.</th>
+                      <th className="px-2 py-2 text-right">Other ded.</th>
+                      <th className="px-2 py-2 text-right">Net</th>
+                      <th className="px-2 py-2 text-right">Paid</th>
+                      <th className="px-2 py-2 text-right">Balance</th>
+                      <th className="px-2 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {draft.lines.map((l, idx) => {
+                      const carry = l.employee_id
+                        ? advanceCarryForward(l.employee_id, month, batches, advances)
+                        : 0;
+                      return (
+                        <tr key={idx} className="border-b border-border align-top last:border-0">
+                          <td className="px-3 py-2">
+                            <EmployeeSearchSelect
+                              employees={employees}
+                              locked={locked}
+                              value={l.employee_id}
+                              onPick={(v) => pickEmployee(idx, v)}
+                            />
+                            {l.employee_id !== "" && (carry > 0 || toNum(l.new_advance) > 0) && (
+                              <div className="mt-1 space-y-0.5 text-[10px] font-semibold">
+                                <p className="text-warn">
+                                  Outstanding from previous months: {fmt(carry)}
+                                </p>
+                                <p className="text-slate-600">
+                                  Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} ·
+                                  Carries to next month:{" "}
+                                  {fmt(
+                                    Math.max(
+                                      0,
+                                      carry - toNum(l.prev_advance) + toNum(l.new_advance),
+                                    ),
+                                  )}
+                                </p>
+                              </div>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-2 font-mono text-[11px] text-slate-600">
+                            {empIdLabel(employees, l.employee_id)}
+                          </td>
+                          <td className="px-2 py-2">
+                            {foremanLine === idx ? (
+                              <input
+                                autoFocus
+                                value={l.foreman}
+                                list="foreman-options"
+                                onChange={(e) => setLine(idx, { foreman: e.target.value })}
+                                onBlur={() => setForemanLine(null)}
+                                className={inputSm + " min-w-30"}
+                                placeholder="Line foreman"
+                              />
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setForemanLine(idx)}
+                                title="Change foreman for this employee"
+                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-gold hover:bg-gold/10"
+                              >
+                                <HardHat size={13} className="text-gold-dark" />
+                                {l.foreman || draft.foreman || "Set"}
+                              </button>
+                            )}
+                          </td>
+                          {(["hours", "rate"] as const).map((f) => (
+                            <td key={f} className="px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={l[f] as string}
+                                onChange={(e) => setLine(idx, { [f]: e.target.value })}
+                                className={inputSm + " w-20 text-right"}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-2 py-2 text-right font-semibold text-navy">
+                            {fmt(lineGross(l))}
+                          </td>
+                          {(
+                            [
+                              "food_deduction",
+                              "prev_advance",
+                              "new_advance",
+                              "other_deduction",
+                            ] as const
+                          ).map((f) => (
+                            <td key={f} className="px-2 py-2">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={l[f] as string}
+                                onChange={(e) => setLine(idx, { [f]: e.target.value })}
+                                className={inputSm + " w-20 text-right"}
+                              />
+                            </td>
+                          ))}
+                          <td className="px-2 py-2 text-right font-bold text-money">
+                            {fmt(toNum(l.net_salary))}
+                          </td>
+                          <td className="px-2 py-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={l.paid as string}
+                              onChange={(e) => setLine(idx, { paid: e.target.value })}
+                              className={inputSm + " w-20 text-right"}
+                            />
+                          </td>
+                          <td className="px-2 py-2 text-right font-semibold">
+                            {fmt(toNum(l.net_salary) - toNum(l.paid))}
+                          </td>
+                          <td className="px-2 py-2">
+                            {(canDelete || !l.id) && (
+                              <button
+                                type="button"
+                                title="Remove line"
+                                onClick={() =>
+                                  setDraft({
+                                    ...draft,
+                                    lines: draft.lines.filter((_, i) => i !== idx),
+                                  })
+                                }
+                                className={btnIcon + " hover:border-danger hover:text-danger"}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {totals && (
+                    <tfoot>
+                      <tr className="bg-navy-soft/70 font-bold text-navy">
+                        <td className="px-3 py-2" colSpan={5}>
+                          Totals
+                        </td>
+                        <td className="px-2 py-2 text-right">{fmt(totals.gross)}</td>
+                        <td className="px-2 py-2" colSpan={4} />
+                        <td className="px-2 py-2 text-right text-money">{fmt(totals.net)}</td>
+                        <td className="px-2 py-2 text-right">{fmt(totals.paid)}</td>
+                        <td className="px-2 py-2 text-right">{fmt(totals.balance)}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {/* Mobile: one card per employee */}
+              <div className="space-y-3 p-3 md:hidden">
+                {draft.lines.map((l, idx) => (
+                  <div
+                    key={idx}
+                    className="mobile-payroll-card rounded-lg border border-border bg-card p-3 shadow-sm"
+                  >
+                    <div className="mb-2 flex items-start gap-2">
+                      <div className="flex-1">
                         <EmployeeSearchSelect
                           employees={employees}
                           locked={locked}
                           value={l.employee_id}
                           onPick={(v) => pickEmployee(idx, v)}
                         />
-                        {l.employee_id !== "" && (carry > 0 || toNum(l.new_advance) > 0) && (
-                          <div className="mt-1 space-y-0.5 text-[10px] font-semibold">
-                            <p className="text-warn">
-                              Outstanding from previous months: {fmt(carry)}
-                            </p>
-                            <p className="text-slate-600">
-                              Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} · Carries
-                              to next month:{" "}
-                              {fmt(
-                                Math.max(0, carry - toNum(l.prev_advance) + toNum(l.new_advance)),
-                              )}
-                            </p>
-                          </div>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-2 py-2 font-mono text-[11px] text-slate-600">
-                        {empIdLabel(employees, l.employee_id)}
-                      </td>
-                      <td className="px-2 py-2">
-                        {foremanLine === idx ? (
-                          <input
-                            autoFocus
-                            value={l.foreman}
-                            list="foreman-options"
-                            onChange={(e) => setLine(idx, { foreman: e.target.value })}
-                            onBlur={() => setForemanLine(null)}
-                            className={inputSm + " min-w-[120px]"}
-                            placeholder="Line foreman"
-                          />
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setForemanLine(idx)}
-                            title="Change foreman for this employee"
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:border-gold hover:bg-gold/10"
-                          >
-                            <HardHat size={13} className="text-gold-dark" />
-                            {l.foreman || draft.foreman || "Set"}
-                          </button>
-                        )}
-                      </td>
-                      {(["hours", "rate"] as const).map((f) => (
-                        <td key={f} className="px-2 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={l[f] as string}
-                            onChange={(e) => setLine(idx, { [f]: e.target.value })}
-                            className={inputSm + " w-20 text-right"}
-                          />
-                        </td>
-                      ))}
-                      <td className="px-2 py-2 text-right font-semibold text-navy">
-                        {fmt(lineGross(l))}
-                      </td>
-                      {(
-                        [
-                          "food_deduction",
-                          "prev_advance",
-                          "new_advance",
-                          "other_deduction",
-                        ] as const
-                      ).map((f) => (
-                        <td key={f} className="px-2 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={l[f] as string}
-                            onChange={(e) => setLine(idx, { [f]: e.target.value })}
-                            className={inputSm + " w-20 text-right"}
-                          />
-                        </td>
-                      ))}
-                      <td className="px-2 py-2 text-right font-bold text-money">
-                        {fmt(toNum(l.net_salary))}
-                      </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={l.paid as string}
-                          onChange={(e) => setLine(idx, { paid: e.target.value })}
-                          className={inputSm + " w-20 text-right"}
-                        />
-                      </td>
-                      <td className="px-2 py-2 text-right font-semibold">
-                        {fmt(toNum(l.net_salary) - toNum(l.paid))}
-                      </td>
-                      <td className="px-2 py-2">
-                        {(canDelete || !l.id) && (
-                          <button
-                            type="button"
-                            title="Remove line"
-                            onClick={() =>
-                              setDraft({
-                                ...draft,
-                                lines: draft.lines.filter((_, i) => i !== idx),
-                              })
-                            }
-                            className={btnIcon + " hover:border-danger hover:text-danger"}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {totals && (
-                <tfoot>
-                  <tr className="bg-navy-soft/70 font-bold text-navy">
-                    <td className="px-3 py-2" colSpan={5}>
-                      Totals
-                    </td>
-                    <td className="px-2 py-2 text-right">{fmt(totals.gross)}</td>
-                    <td className="px-2 py-2" colSpan={4} />
-                    <td className="px-2 py-2 text-right text-money">{fmt(totals.net)}</td>
-                    <td className="px-2 py-2 text-right">{fmt(totals.paid)}</td>
-                    <td className="px-2 py-2 text-right">{fmt(totals.balance)}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
+                        <p className="mt-1 font-mono text-[10px] text-slate-500">
+                          ID {empIdLabel(employees, l.employee_id)}
+                        </p>
+                      </div>
+                      {(canDelete || !l.id) && (
+                        <button
+                          type="button"
+                          title="Remove line"
+                          onClick={() =>
+                            setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== idx) })
+                          }
+                          className={btnIcon + " hover:border-danger hover:text-danger"}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
 
-          {/* Mobile: one card per employee */}
-          <div className="space-y-3 p-3 md:hidden">
-            {draft.lines.map((l, idx) => (
-              <div
-                key={idx}
-                className="mobile-payroll-card rounded-lg border border-border bg-card p-3 shadow-sm"
-              >
-                <div className="mb-2 flex items-start gap-2">
-                  <div className="flex-1">
-                    <EmployeeSearchSelect
-                      employees={employees}
-                      locked={locked}
-                      value={l.employee_id}
-                      onPick={(v) => pickEmployee(idx, v)}
-                    />
-                    <p className="mt-1 font-mono text-[10px] text-slate-500">
-                      ID {empIdLabel(employees, l.employee_id)}
-                    </p>
-                  </div>
-                  {(canDelete || !l.id) && (
-                    <button
-                      type="button"
-                      title="Remove line"
-                      onClick={() =>
-                        setDraft({ ...draft, lines: draft.lines.filter((_, i) => i !== idx) })
-                      }
-                      className={btnIcon + " hover:border-danger hover:text-danger"}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
-
-                <label className="mb-2 block">
-                  <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
-                    <HardHat size={12} className="text-gold-dark" /> Foreman
-                  </span>
-                  <input
-                    value={l.foreman}
-                    list="foreman-options"
-                    onChange={(e) => setLine(idx, { foreman: e.target.value })}
-                    placeholder={draft.foreman || "Foreman name"}
-                    className={inputSm}
-                  />
-                </label>
-
-                <div className="grid grid-cols-2 gap-3">
-                  {(
-                    [
-                      ["hours", "Hours"],
-                      ["rate", "Rate"],
-                      ["food_deduction", "Food"],
-                      ["prev_advance", "Prev adv."],
-                      ["new_advance", "New adv."],
-                      ["other_deduction", "Other ded."],
-                      ["paid", "Paid"],
-                    ] as const
-                  ).map(([f, label]) => (
-                    <label key={f} className="block">
-                      <span className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
-                        {label}
+                    <label className="mb-2 block">
+                      <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500">
+                        <HardHat size={12} className="text-gold-dark" /> Foreman
                       </span>
                       <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        value={l[f] as string}
-                        onChange={(e) => setLine(idx, { [f]: e.target.value })}
-                        className={inputSm + " text-right"}
+                        value={l.foreman}
+                        list="foreman-options"
+                        onChange={(e) => setLine(idx, { foreman: e.target.value })}
+                        placeholder={draft.foreman || "Foreman name"}
+                        className={inputSm}
                       />
                     </label>
-                  ))}
-                  <div className="self-end rounded-md bg-navy-soft px-3 py-2 text-right">
-                    <span className="block text-[10px] font-bold uppercase text-slate-500">
-                      Net
-                    </span>
-                    <span className="text-sm font-extrabold text-money">
-                      {fmt(toNum(l.net_salary))}
-                    </span>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {(
+                        [
+                          ["hours", "Hours"],
+                          ["rate", "Rate"],
+                          ["food_deduction", "Food"],
+                          ["prev_advance", "Prev adv."],
+                          ["new_advance", "New adv."],
+                          ["other_deduction", "Other ded."],
+                          ["paid", "Paid"],
+                        ] as const
+                      ).map(([f, label]) => (
+                        <label key={f} className="block">
+                          <span className="mb-1 block text-[10px] font-bold uppercase text-slate-500">
+                            {label}
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={l[f] as string}
+                            onChange={(e) => setLine(idx, { [f]: e.target.value })}
+                            className={inputSm + " text-right"}
+                          />
+                        </label>
+                      ))}
+                      <div className="self-end rounded-md bg-navy-soft px-3 py-2 text-right">
+                        <span className="block text-[10px] font-bold uppercase text-slate-500">
+                          Net
+                        </span>
+                        <span className="text-sm font-extrabold text-money">
+                          {fmt(toNum(l.net_salary))}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="mt-2 flex justify-between text-[11px] font-semibold text-slate-600">
+                      <span>Gross {fmt(lineGross(l))}</span>
+                      <span>Balance {fmt(toNum(l.net_salary) - toNum(l.paid))}</span>
+                    </p>
                   </div>
-                </div>
+                ))}
 
-                <p className="mt-2 flex justify-between text-[11px] font-semibold text-slate-600">
-                  <span>Gross {fmt(lineGross(l))}</span>
-                  <span>Balance {fmt(toNum(l.net_salary) - toNum(l.paid))}</span>
-                </p>
+                {totals && (
+                  <div className="rounded-lg bg-navy-soft/70 px-3 py-2 text-xs font-bold text-navy">
+                    Totals — Gross {fmt(totals.gross)} · Net {fmt(totals.net)} · Paid{" "}
+                    {fmt(totals.paid)} · Balance {fmt(totals.balance)}
+                  </div>
+                )}
               </div>
-            ))}
 
-            {totals && (
-              <div className="rounded-lg bg-navy-soft/70 px-3 py-2 text-xs font-bold text-navy">
-                Totals — Gross {fmt(totals.gross)} · Net {fmt(totals.net)} · Paid {fmt(totals.paid)}{" "}
-                · Balance {fmt(totals.balance)}
+              <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, lines: [...draft.lines, emptyLine()] })}
+                  className={btnOutline}
+                >
+                  <Plus size={15} /> Add employee line
+                </button>
+                {onNewEmployee && (
+                  <button type="button" onClick={onNewEmployee} className={btnOutline}>
+                    <UserPlus size={15} /> New employee
+                  </button>
+                )}
               </div>
-            )}
+            </div>
 
-            <SlideToSave onSave={save} saving={saving} />
-          </div>
-
-          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-            <button
-              type="button"
-              onClick={() => setDraft({ ...draft, lines: [...draft.lines, emptyLine()] })}
-              className={btnOutline}
-            >
-              <Plus size={15} /> Add employee line
-            </button>
-            {onNewEmployee && (
-              <button type="button" onClick={onNewEmployee} className={btnOutline}>
-                <UserPlus size={15} /> New employee
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border bg-card px-4 py-3">
+              <button
+                type="button"
+                onClick={closeEditor}
+                disabled={saving || isImporting}
+                className={btnOutline}
+              >
+                <X size={15} /> Cancel
               </button>
-            )}
-          </div>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={
+                  saving || isImporting || validationErrors.length > 0 || importErrors.length > 0
+                }
+                className={btnGold}
+              >
+                <Save size={15} /> {saving ? "Saving…" : "Save batch"}
+              </button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
 
       <div className="space-y-3">
         {monthBatches.length === 0 && !draft && (
@@ -736,7 +1073,7 @@ export function PayrollTab({
                   {fmt(net)} / {fmt(paid)}
                 </p>
               </div>
-              <button onClick={() => setDraft(b)} className={btnPrimary}>
+              <button onClick={() => startEdit(b)} className={btnPrimary}>
                 <Pencil size={14} /> Edit
               </button>
               {canDelete && (

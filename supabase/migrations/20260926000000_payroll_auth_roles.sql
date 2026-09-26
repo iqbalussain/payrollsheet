@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS public.users (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'hr'))
+  email TEXT,
+  role TEXT NOT NULL CHECK (role IN ('admin', 'hr')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;

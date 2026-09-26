@@ -408,12 +408,10 @@ function Dashboard({ role, email }: { role: "admin" | "hr" | string; email: stri
                 setForm(emptyForm);
                 setMode("new");
               }}
-              onSave={(batch) =>
-                saveBatch.mutate(batch, {
-                  onSuccess: () => notify("Payroll batch saved."),
-                  onError: (e) => notify((e as Error).message, "warn"),
-                })
-              }
+              onSave={async (batch) => {
+                await saveBatch.mutateAsync(batch);
+                notify("Payroll batch saved.");
+              }}
               onDelete={(id) =>
                 deleteBatch.mutate(id, {
                   onSuccess: () => notify("Payroll batch deleted."),
