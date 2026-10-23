@@ -420,6 +420,7 @@ export function TimesheetsTab({
   const [employeePickerOpen, setEmployeePickerOpen] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState("");
   const [attendanceSearch, setAttendanceSearch] = useState("");
+  const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<AttendanceStatus | "">("");
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [monthlyAttendanceOpen, setMonthlyAttendanceOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -501,14 +502,14 @@ export function TimesheetsTab({
   );
   const filteredAttendanceEmployees = useMemo(() => {
     const query = attendanceSearch.trim().toLowerCase();
-    if (!query) return selectedEmployees;
     return selectedEmployees.filter((employee) =>
+      (!attendanceStatusFilter || (attendance[employee.id]?.status ?? "PRESENT") === attendanceStatusFilter) &&
       [employee.name, employee.trade, employee.id_number, String(employee.id)]
         .join(" ")
         .toLowerCase()
         .includes(query),
     );
-  }, [attendanceSearch, selectedEmployees]);
+  }, [attendanceSearch, attendanceStatusFilter, attendance, selectedEmployees]);
   const applyRecordedAssignment = () => {
     const matches = (assignmentsQuery.data ?? []).filter(
       (a) =>
@@ -1639,11 +1640,25 @@ export function TimesheetsTab({
                       <input
                         value={attendanceSearch}
                         onChange={(event) => setAttendanceSearch(event.target.value)}
-                        placeholder="Search selected employees"
+                        placeholder="Name, ID or trade…"
                         aria-label="Search selected employees"
                         className={`${input} h-8 pl-8 text-xs`}
                       />
                     </label>
+                    <select
+                      value={attendanceStatusFilter}
+                      onChange={(event) => setAttendanceStatusFilter(event.target.value as AttendanceStatus | "")}
+                      aria-label="Filter attendance status"
+                      className={`${select} h-8 w-auto max-w-40 rounded-md px-2 py-1 text-xs`}
+                    >
+                      <option value="">All statuses</option>
+                      {ATTENDANCE_STATUSES.map(({ value, label }) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs tabular-nums text-muted-foreground" role="status">
+                      {filteredAttendanceEmployees.length}/{selectedEmployees.length}
+                    </span>
                     <div className="relative w-full max-w-xs">
                       <button
                         type="button"
