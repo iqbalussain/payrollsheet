@@ -205,6 +205,21 @@ export function usePayrollSiteAllocations(month: string, enabled = true) {
   });
 }
 
+export function usePayrollLinesForMonth(month: string, enabled = true) {
+  return useQuery({
+    queryKey: ["payroll_lines_month", month],
+    queryFn: async (): Promise<Tables<"payroll_lines">[]> => {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) {
+        throw new Error("Select a valid payroll month.");
+      }
+      const rows = await readCachedRows<Tables<"payroll_lines">>("payroll_lines", { month });
+      return rows.filter((row) => row.month === month);
+    },
+    enabled: enabled && /^\d{4}-(0[1-9]|1[0-2])$/.test(month),
+    staleTime: 60_000,
+  });
+}
+
 export function useSaveTimesheets() {
   const qc = useQueryClient();
   return useMutation({

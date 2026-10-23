@@ -3,7 +3,7 @@ import { ChevronRight, List, MapPin, Users } from "lucide-react";
 import { currentPayrollMonth, fmt, type Employee } from "@/lib/payroll";
 import { btnGold, card, select } from "./ui";
 import { CostDetailsModal } from "./CostDetailsModal";
-import { usePayrollSiteAllocations } from "@/lib/payroll-data";
+import { usePayrollSiteAllocations, usePayrollLinesForMonth } from "@/lib/payroll-data";
 import { allocationTotals, buildAllocationRows } from "@/lib/cost-allocation";
 
 type GroupBy = "site" | "foreman" | "site+foreman";
@@ -18,9 +18,10 @@ export function CostTab({ employees, notify }: Props) {
   const [filterMonth, setFilterMonth] = useState(currentPayrollMonth);
   const [listOpen, setListOpen] = useState(false);
   const allocationsQuery = usePayrollSiteAllocations(filterMonth);
+  const linesQuery = usePayrollLinesForMonth(filterMonth);
   const allocationRows = useMemo(
-    () => buildAllocationRows(allocationsQuery.data ?? [], employees),
-    [allocationsQuery.data, employees],
+    () => buildAllocationRows(allocationsQuery.data ?? [], employees, linesQuery.data),
+    [allocationsQuery.data, employees, linesQuery.data],
   );
   const totals = useMemo(() => allocationTotals(allocationRows), [allocationRows]);
 
@@ -30,9 +31,9 @@ export function CostTab({ employees, notify }: Props) {
       {
         label: string;
         workers: Set<string>;
-        gross: number;
         regularHours: number;
-        overtimeHours: number;
+        paid: number;
+        balance: number;
       }
     > = {};
     allocationRows.forEach((allocation) => {
@@ -45,27 +46,27 @@ export function CostTab({ employees, notify }: Props) {
       buckets[key] ??= {
         label: key,
         workers: new Set(),
-        gross: 0,
         regularHours: 0,
-        overtimeHours: 0,
+        paid: 0,
+        balance: 0,
       };
       const bucket = buckets[key];
       bucket.workers.add(allocation.employeeId);
-      bucket.gross += allocation.grossCost;
       bucket.regularHours += allocation.regularHours;
-      bucket.overtimeHours += allocation.overtimeHours;
+      bucket.paid += allocation.paid;
+      bucket.balance += allocation.balance;
     });
     return Object.values(buckets)
       .map((b) => ({ ...b, workers: b.workers.size }))
-      .sort((a, b) => b.gross - a.gross);
+      .sort((a, b) => b.paid - a.paid);
   }, [allocationRows, groupBy]);
 
   const grand = useMemo(() => {
     return {
       workers: totals.staff,
-      gross: totals.grossCost,
       regularHours: totals.regularHours,
-      overtimeHours: totals.overtimeHours,
+      paid: totals.paid,
+      balance: totals.balance,
     };
   }, [totals]);
 
@@ -104,9 +105,8 @@ export function CostTab({ employees, notify }: Props) {
           <List size={15} /> View List
         </button>
         <p className="w-full text-xs text-muted-foreground lg:w-auto">
-          Gross labour cost is allocated by actual attendance hours. Advances and employee
-          deductions are excluded; historical payroll without attendance is estimated at its saved
-          batch site.
+          Labour cost allocated by actual attendance hours. Historical payroll without attendance is
+          estimated at its saved batch site.
         </p>
       </div>
 
@@ -121,13 +121,13 @@ export function CostTab({ employees, notify }: Props) {
       <div className="mobile-metric-grid grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Unique workers", value: String(grand.workers) },
-          { label: "Allocated gross labour cost (OMR)", value: fmt(grand.gross), money: true },
           { label: "Regular hours", value: fmt(grand.regularHours) },
-          { label: "Overtime hours", value: fmt(grand.overtimeHours) },
+          { label: "Paid (OMR)", value: fmt(grand.paid), money: true },
+          { label: "Balance (OMR)", value: fmt(grand.balance), money: true },
         ].map((s) => (
           <div
             key={s.label}
-            className={`${card} p-3.5 ${s.label.includes("remaining") ? "mobile-metric-alert" : ""}`}
+            className={`${card} p-3.5`}
           >
             <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {s.label}
@@ -161,16 +161,16 @@ export function CostTab({ employees, notify }: Props) {
                 </p>
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <span className="data-badge">
-                    <small>Regular hrs</small>
+                    <small>Hours</small>
                     {fmt(row.regularHours)}
                   </span>
-                  <span className="data-badge data-badge-due">
-                    <small>OT hrs</small>
-                    {fmt(row.overtimeHours)}
-                  </span>
                   <span className="data-badge data-badge-paid">
-                    <small>Gross cost</small>
-                    {fmt(row.gross)}
+                    <small>Paid</small>
+                    {fmt(row.paid)}
+                  </span>
+                  <span className="data-badge data-badge-due">
+                    <small>Balance</small>
+                    {fmt(row.balance)}
                   </span>
                 </div>
               </div>
@@ -187,8 +187,8 @@ export function CostTab({ employees, notify }: Props) {
                 <th className="px-4 py-3">Site</th>
                 <th className="px-4 py-3 text-right">Workers</th>
                 <th className="px-4 py-3 text-right">Regular hours</th>
-                <th className="px-4 py-3 text-right">Overtime hours</th>
-                <th className="px-4 py-3 text-right">Gross labour cost (OMR)</th>
+                <th className="px-4 py-3 text-right">Paid (OMR)</th>
+                <th className="px-4 py-3 text-right">Balance (OMR)</th>
               </tr>
             </thead>
             <tbody>
@@ -196,10 +196,10 @@ export function CostTab({ employees, notify }: Props) {
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                     {allocationsQuery.isLoading
-                      ? "Loading verified site allocations…"
+                      ? "Loading site allocations…"
                       : allocationsQuery.error
                         ? `Could not load site allocations: ${allocationsQuery.error.message}`
-                        : "No verified attendance-based allocations for the selected month."}
+                        : "No allocations for the selected month."}
                   </td>
                 </tr>
               ) : (
@@ -214,11 +214,11 @@ export function CostTab({ employees, notify }: Props) {
                       <td className="px-4 py-2.5 text-right text-slate-600">
                         {fmt(r.regularHours)}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-slate-600">
-                        {fmt(r.overtimeHours)}
-                      </td>
                       <td className="px-4 py-2.5 text-right font-bold text-money">
-                        {fmt(r.gross)}
+                        {fmt(r.paid)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold text-navy">
+                        {fmt(r.balance)}
                       </td>
                     </tr>
                   );
@@ -231,8 +231,8 @@ export function CostTab({ employees, notify }: Props) {
                   <td className="px-4 py-2.5">TOTAL</td>
                   <td className="px-4 py-2.5 text-right">{grand.workers}</td>
                   <td className="px-4 py-2.5 text-right">{fmt(grand.regularHours)}</td>
-                  <td className="px-4 py-2.5 text-right">{fmt(grand.overtimeHours)}</td>
-                  <td className="px-4 py-2.5 text-right text-money">{fmt(grand.gross)}</td>
+                  <td className="px-4 py-2.5 text-right text-money">{fmt(grand.paid)}</td>
+                  <td className="px-4 py-2.5 text-right">{fmt(grand.balance)}</td>
                 </tr>
               </tfoot>
             )}
