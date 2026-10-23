@@ -88,3 +88,19 @@ Employees, payroll, advances, timesheets, and site allocations are read from a u
 Follow [`docs/operations.md`](./docs/operations.md) to configure managed backups, create encrypted logical data backups, and run a recovery drill against a matching staging project.
 
 Run `npm run test:ops` to validate backup/restore script guardrails using mocked PostgreSQL tools. This does not replace the staging restore drill.
+
+modify the Cost Allocation page and the View List modal. Let me understand the requirements:
+
+Cost Allocation main page (CostTab.tsx):
+
+Keep: Site, Workers, Regular Hours
+Add: Paid, Balance
+Remove: Overtime Hours, Gross Labour Cost (replace with Paid/Balance)
+
+View List modal (CostDetailsModal.tsx):
+
+Keep: Emp ID, Employee, Trade, Site, Foreman, Month
+Keep: Hours (regular hours)
+Remove: OT hrs, Allocated Regular Pay, Allocated OT Pay, Allocated Allowances
+Add: Gross Salary (hrs worked × rate per hr), Food Deduction, Advance Deduction (current month), Outstanding, Net Pay
+Remove: Allocation Basis
