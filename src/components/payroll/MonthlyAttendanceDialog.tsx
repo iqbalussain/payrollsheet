@@ -359,7 +359,6 @@ export function MonthlyAttendanceDialog({
   const empDropdownRef = useRef<HTMLDivElement>(null);
 
   // Column visibility options: In Time, Out Time, Break
-  // By default, inTime, outTime, and breakHours are unchecked so users can easily enter total hours directly!
   const [visibleColumns, setVisibleColumns] = useState({
     inTime: false,
     outTime: false,
@@ -378,40 +377,6 @@ export function MonthlyAttendanceDialog({
   const [singleEmployeeId, setSingleEmployeeId] = useState("");
   const [days, setDays] = useState<Record<number, DayDraft>>({});
   const loadedContext = useRef("");
-
-  // Derive selected employee display label
-  const selectedEmployee = useMemo(
-    () => employeesByName.find((e) => String(e.id) === singleEmployeeId),
-    [singleEmployeeId, employeesByName],
-  );
-
-  // Filtered list for the combobox
-  const empSearchResults = useMemo(() => {
-    const q = empSearch.trim().toLowerCase();
-    if (!q) return employeesByName;
-    return employeesByName.filter(
-      (e) =>
-        e.name.toLowerCase().includes(q) ||
-        (e.id_number && e.id_number.toLowerCase().includes(q)) ||
-        (e.trade && e.trade.toLowerCase().includes(q)),
-    );
-  }, [empSearch, employeesByName]);
-
-  // Click-outside to close employee dropdown
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        empDropdownRef.current &&
-        !empDropdownRef.current.contains(e.target as Node) &&
-        empSearchRef.current &&
-        !empSearchRef.current.contains(e.target as Node)
-      ) {
-        setEmpDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // Multiple employees state
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<number>>(new Set());
@@ -453,10 +418,29 @@ export function MonthlyAttendanceDialog({
     [month],
   );
 
+  // Defined BEFORE any useMemo that depends on it (fixing the ReferenceError)
   const employeesByName = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name)),
     [employees],
   );
+
+  // Derive selected employee display label
+  const selectedEmployee = useMemo(
+    () => employeesByName.find((e) => String(e.id) === singleEmployeeId),
+    [singleEmployeeId, employeesByName],
+  );
+
+  // Filtered list for the combobox
+  const empSearchResults = useMemo(() => {
+    const q = empSearch.trim().toLowerCase();
+    if (!q) return employeesByName;
+    return employeesByName.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.id_number && e.id_number.toLowerCase().includes(q)) ||
+        (e.trade && e.trade.toLowerCase().includes(q)),
+    );
+  }, [empSearch, employeesByName]);
 
   const filteredEmployees = useMemo(() => {
     const q = employeeSearch.trim().toLowerCase();
@@ -468,6 +452,22 @@ export function MonthlyAttendanceDialog({
         (e.trade && e.trade.toLowerCase().includes(q)),
     );
   }, [employeeSearch, employeesByName]);
+
+  // Click-outside to close employee dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        empDropdownRef.current &&
+        !empDropdownRef.current.contains(e.target as Node) &&
+        empSearchRef.current &&
+        !empSearchRef.current.contains(e.target as Node)
+      ) {
+        setEmpDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const projects = projectsQuery.data ?? [];
 
