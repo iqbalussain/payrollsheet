@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, FileSpreadsheet, Search, Share2, Users, X } from "lucide-react";
 import { fmt, monthLabel, type Employee } from "@/lib/payroll";
 import { allocationTotals, buildAllocationRows, type AllocationRow } from "@/lib/cost-allocation";
-import { usePayrollSiteAllocations } from "@/lib/payroll-data";
+import {
+  usePayrollSiteAllocations,
+  usePayrollLinesForMonth,
+  usePayrollAdvanceBalancesBefore,
+} from "@/lib/payroll-data";
 import {
   COMPANY_NAME,
   costReportBlob,
@@ -33,15 +37,28 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
   const [fSite, setFSite] = useState("");
   const [fForeman, setFForeman] = useState("");
   const [detail, setDetail] = useState<AllocationRow | null>(null);
-  const allocationsQuery = usePayrollSiteAllocations(fMonth, open);
 
   useEffect(() => {
     if (open) setFMonth(month);
   }, [open, month]);
 
+  const allocationsQuery = usePayrollSiteAllocations(fMonth, open);
+  const linesQuery = usePayrollLinesForMonth(fMonth, open);
+  const advanceBalancesQuery = usePayrollAdvanceBalancesBefore(fMonth);
+  const openingBalances = useMemo(
+    () => new Map((advanceBalancesQuery.data ?? []).map((b) => [b.employee_id, b.balance])),
+    [advanceBalancesQuery.data],
+  );
+
   const all = useMemo(
-    () => buildAllocationRows(allocationsQuery.data ?? [], employees),
-    [allocationsQuery.data, employees],
+    () =>
+      buildAllocationRows(
+        allocationsQuery.data ?? [],
+        employees,
+        linesQuery.data,
+        openingBalances,
+      ),
+    [allocationsQuery.data, employees, linesQuery.data, openingBalances],
   );
 
   const sites = useMemo(() => [...new Set(all.map((r) => r.site))].sort(), [all]);
@@ -169,12 +186,9 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
         <div className="grid grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-4">
           {[
             { label: "Employees", value: String(totals.staff), icon: true },
-            { label: "Regular pay", value: `${fmt(totals.regularPay)} OMR` },
-            { label: "Overtime pay", value: `${fmt(totals.overtimePay)} OMR` },
-            {
-              label: "Allocated gross cost",
-              value: `${fmt(totals.grossCost)} OMR`,
-            },
+            { label: "Total Hours", value: fmt(totals.regularHours) },
+            { label: "Gross Salary", value: `${fmt(totals.grossSalary)} OMR` },
+            { label: "Net Pay", value: `${fmt(totals.netPay)} OMR` },
           ].map((metric) => (
             <div key={metric.label} className="rounded-xl bg-navy-soft/70 px-3 py-2.5">
               <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -198,20 +212,19 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                 <th className="px-3 py-2">Site</th>
                 <th className="px-3 py-2">Foreman</th>
                 <th className="px-3 py-2">Month</th>
-                <th className="px-3 py-2 text-right">Regular hrs</th>
-                <th className="px-3 py-2 text-right">OT hrs</th>
-                <th className="px-3 py-2 text-right">Regular pay</th>
-                <th className="px-3 py-2 text-right">OT pay</th>
-                <th className="px-3 py-2 text-right">Allowances</th>
-                <th className="px-3 py-2 text-right">Gross cost</th>
-                <th className="px-3 py-2">Basis</th>
+                <th className="px-3 py-2 text-right">Hours</th>
+                <th className="px-3 py-2 text-right">Gross Salary</th>
+                <th className="px-3 py-2 text-right">Food Deduction</th>
+                <th className="px-3 py-2 text-right">Advance Deduction</th>
+                <th className="px-3 py-2 text-right">Outstanding</th>
+                <th className="px-3 py-2 text-right font-bold text-navy">Net Pay</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-3 py-10 text-center text-slate-400">
-                    {allocationsQuery.isLoading
+                  <td colSpan={12} className="px-3 py-10 text-center text-slate-400">
+                    {allocationsQuery.isLoading || linesQuery.isLoading
                       ? "Loading site allocations…"
                       : allocationsQuery.error
                         ? `Could not load site allocations: ${allocationsQuery.error.message}`
@@ -233,15 +246,24 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                     <td className="px-3 py-2 text-slate-600">{r.site}</td>
                     <td className="px-3 py-2 text-slate-600">{r.foreman}</td>
                     <td className="px-3 py-2 text-slate-600">{r.month}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.regularHours)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.overtimeHours)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.allocatedRegularPay)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.allocatedOvertimePay)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(r.allocatedAllowances)}</td>
-                    <td className="px-3 py-2 text-right font-bold text-money">
-                      {fmt(r.grossCost)}
+                    <td className="px-3 py-2 text-right text-slate-600">
+                      {fmt(r.regularHours)}
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{r.allocationBasis}</td>
+                    <td className="px-3 py-2 text-right font-medium text-slate-700">
+                      {fmt(r.grossSalary)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">
+                      {fmt(r.foodDeduction)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">
+                      {fmt(r.advanceDeduction)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">
+                      {fmt(r.outstanding)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-money">
+                      {fmt(r.netPay)}
+                    </td>
                   </tr>
                 ))
               )}
@@ -260,17 +282,17 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
               >
                 <p className="text-sm font-bold text-navy">{r.name}</p>
                 <p className="text-[11px] text-slate-500">
-                  ID {r.employeeId} · {r.site} · {r.foreman} · {r.month}
+                  ID {r.employeeId} · {r.trade} · {r.site} · {r.foreman} · {r.month}
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
                   <span>
-                    Regular hrs <b>{fmt(r.regularHours)}</b>
+                    Hours <b>{fmt(r.regularHours)}</b>
                   </span>
                   <span>
-                    OT hrs <b>{fmt(r.overtimeHours)}</b>
+                    Gross <b>{fmt(r.grossSalary)}</b>
                   </span>
                   <span>
-                    Gross <b className="text-money">{fmt(r.grossCost)}</b>
+                    Net <b className="text-money">{fmt(r.netPay)}</b>
                   </span>
                 </div>
               </button>
@@ -280,11 +302,12 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
 
         <div className="flex flex-wrap gap-4 border-t border-border bg-navy-soft/60 px-4 py-3 text-xs font-bold text-navy">
           <span>Total staff: {totals.staff}</span>
-          <span>Regular hours: {fmt(totals.regularHours)}</span>
-          <span>Overtime hours: {fmt(totals.overtimeHours)}</span>
-          <span>Regular pay: {fmt(totals.regularPay)} OMR</span>
-          <span>Overtime pay: {fmt(totals.overtimePay)} OMR</span>
-          <span className="text-money">Allocated gross cost: {fmt(totals.grossCost)} OMR</span>
+          <span>Hours: {fmt(totals.regularHours)}</span>
+          <span>Gross salary: {fmt(totals.grossSalary)} OMR</span>
+          <span>Food deduction: {fmt(totals.foodDeduction)} OMR</span>
+          <span>Advance deduction: {fmt(totals.advanceDeduction)} OMR</span>
+          <span>Outstanding: {fmt(totals.outstanding)} OMR</span>
+          <span className="text-money">Net pay: {fmt(totals.netPay)} OMR</span>
         </div>
 
         {detail && (
@@ -310,13 +333,15 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                     ["Site / project", detail.site],
                     ["Foreman", detail.foreman],
                     ["Month", monthLabel(detail.month)],
-                    ["Regular hours", fmt(detail.regularHours)],
-                    ["Overtime hours", fmt(detail.overtimeHours)],
-                    ["Allocated regular pay", fmt(detail.allocatedRegularPay)],
-                    ["Allocated overtime pay", fmt(detail.allocatedOvertimePay)],
-                    ["Allocated allowances", fmt(detail.allocatedAllowances)],
-                    ["Allocated gross cost", fmt(detail.grossCost)],
-                    ["Allocation basis", detail.allocationBasis],
+                    ["Hours", fmt(detail.regularHours)],
+                    ["Rate (OMR/hr)", fmt(detail.rate)],
+                    ["Gross salary (hrs × rate)", `${fmt(detail.grossSalary)} OMR`],
+                    ["Food deduction", `${fmt(detail.foodDeduction)} OMR`],
+                    ["Advance deduction (current month)", `${fmt(detail.advanceDeduction)} OMR`],
+                    ["Outstanding advance", `${fmt(detail.outstanding)} OMR`],
+                    ["Net pay", `${fmt(detail.netPay)} OMR`],
+                    ["Paid", `${fmt(detail.paid)} OMR`],
+                    ["Balance", `${fmt(detail.balance)} OMR`],
                   ] as const
                 ).map(([k, v]) => (
                   <div

@@ -15,13 +15,12 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
     "Site",
     "Foreman",
     "Month",
-    "Regular hours",
-    "Overtime hours",
-    "Allocated regular pay",
-    "Allocated overtime pay",
-    "Allocated allowances",
-    "Allocated gross labour cost",
-    "Allocation basis",
+    "Hours",
+    "Gross Salary",
+    "Food Deduction",
+    "Advance Deduction",
+    "Outstanding",
+    "Net Pay",
   ];
   const lines = rows.map((r) =>
     [
@@ -32,12 +31,11 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
       r.foreman,
       monthLabel(r.month),
       fmt(r.regularHours),
-      fmt(r.overtimeHours),
-      fmt(r.allocatedRegularPay),
-      fmt(r.allocatedOvertimePay),
-      fmt(r.allocatedAllowances),
-      fmt(r.grossCost),
-      r.allocationBasis,
+      fmt(r.grossSalary),
+      fmt(r.foodDeduction),
+      fmt(r.advanceDeduction),
+      fmt(r.outstanding),
+      fmt(r.netPay),
     ]
       .map(escapeCsv)
       .join(","),

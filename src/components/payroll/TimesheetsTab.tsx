@@ -1269,9 +1269,22 @@ export function TimesheetsTab({
       <section className={`${card} timesheet-panel space-y-4 border border-navy/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,245,249,0.96))] p-4 shadow-[0_14px_28px_rgba(15,23,42,0.04)] sm:p-5`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-display text-base font-extrabold text-navy">
-              {role === "foreman" ? "Your assigned projects" : "Active projects"}
-            </h2>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="font-display text-base font-extrabold text-navy">
+                {role === "foreman" ? "Your assigned projects" : "Active projects"}
+              </h2>
+  
+              {role !== "foreman" && (
+                <button
+                  type="button"
+                  onClick={() => setMonthlyAttendanceOpen(true)}
+                  className={`${btnGold} h-7 rounded-md px-2.5 text-xs font-semibold`}
+                >
+                  <CalendarDays size={13} /> Monthly entry
+                </button>
+              )}
+            </div>
+
             <p className="mt-1 text-xs text-muted-foreground">
               {role === "foreman"
                 ? "Choose an assigned project to review its team and record attendance."
@@ -1392,6 +1405,7 @@ export function TimesheetsTab({
                   {site || "Select a project"}
                   {foreman ? ` · ${foreman}` : ""}
                 </h2>
+    
                 <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                   Daily · {workDate}
                 </p>
@@ -2271,6 +2285,8 @@ export function TimesheetsTab({
           onSave={onSave}
           onOpenChange={setMonthlyAttendanceOpen}
           notify={notify}
+          initialProjectId={selectedProjectId}
+          initialForeman={foreman}
         />
       )}
     </section>
