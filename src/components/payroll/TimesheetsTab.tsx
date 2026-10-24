@@ -11,7 +11,6 @@ import {
   Pencil,
   Plus,
   Search,
-
   Trash2,
   Users,
   X,
@@ -100,10 +99,10 @@ function batchKey(site: string, foreman: string) {
 function defaultAttendance(): AttendanceDraft {
   return {
     status: "PRESENT",
-    inTime: "06:00",
-    outTime: "18:00",
+    inTime: "08:00",
+    outTime: "17:00",
     breakHours: "1",
-    manualHours: "11",
+    manualHours: "8",
     notes: "",
   };
 }
@@ -145,8 +144,20 @@ function hoursFor(draft: AttendanceDraft) {
   if (!worked(draft.status) || !draft.inTime || !draft.outTime) return 0;
   const [inHour, inMinute] = draft.inTime.split(":").map(Number);
   const [outHour, outMinute] = draft.outTime.split(":").map(Number);
-  const start = inHour! * 60 + inMinute!;
-  const end = outHour! * 60 + outMinute!;
+  if (
+    inHour === undefined ||
+    inMinute === undefined ||
+    outHour === undefined ||
+    outMinute === undefined ||
+    Number.isNaN(inHour) ||
+    Number.isNaN(inMinute) ||
+    Number.isNaN(outHour) ||
+    Number.isNaN(outMinute)
+  ) {
+    return 0;
+  }
+  const start = inHour * 60 + inMinute;
+  const end = outHour * 60 + outMinute;
   if (end <= start) return 0;
   return Math.max(0, (end - start) / 60 - (Number(draft.breakHours) || 0));
 }
@@ -184,7 +195,6 @@ function MobileAttendanceCard({
 
   return (
     <article className="rounded-xl border border-border bg-white p-3 shadow-sm">
-      {/* Top Row: Checkbox, Name/Trade, and Total Hours */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-start gap-2.5 min-w-0 flex-1">
           <input
@@ -205,7 +215,6 @@ function MobileAttendanceCard({
           </div>
         </div>
 
-        {/* Total Hours moved right next to the name */}
         <div className="flex flex-col items-end shrink-0 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
           <span className="text-[9px] font-bold uppercase text-slate-400">Total</span>
           <span className="text-xs font-bold tabular-nums text-navy">
@@ -214,7 +223,6 @@ function MobileAttendanceCard({
         </div>
       </div>
 
-      {/* Status Row with a smaller, compact dropdown */}
       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2">
         <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
           Status
@@ -233,7 +241,6 @@ function MobileAttendanceCard({
         </select>
       </div>
 
-      {/* Time Inputs Row: Wider In/Out, Narrower Break/OT */}
       <div className="mt-2.5 flex items-end gap-1.5">
         {visibleColumns.inTime && (
           <label className="min-w-0 flex-[1.2] text-[9px] font-bold uppercase tracking-wide text-slate-500">
@@ -294,7 +301,6 @@ function MobileAttendanceCard({
         )}
       </div>
 
-      {/* Attendance Note */}
       <label className="mt-2.5 block text-[9px] font-bold uppercase tracking-wide text-slate-500">
         Attendance note
         <input
@@ -510,6 +516,7 @@ export function TimesheetsTab({
         .includes(query),
     );
   }, [attendanceSearch, attendanceStatusFilter, attendance, selectedEmployees]);
+
   const applyRecordedAssignment = () => {
     const matches = (assignmentsQuery.data ?? []).filter(
       (a) =>
@@ -539,6 +546,7 @@ export function TimesheetsTab({
     );
     setDirty(true);
   };
+
   const filteredPickerEmployees = useMemo(() => {
     const query = employeeSearch.trim().toLowerCase();
     return activeEmployees.filter((employee) => {
@@ -559,6 +567,7 @@ export function TimesheetsTab({
       );
     });
   }, [activeEmployees, editingKey, employeeSearch, projectAssignmentIds, role, timesheets]);
+
   const duplicateAssignments = useMemo(
     () =>
       selectedEmployees.flatMap((employee) => {
@@ -573,6 +582,7 @@ export function TimesheetsTab({
       }),
     [editingKey, selectedEmployees, timesheets],
   );
+
   const selectedCount = selectedIds.length;
   const scheduledHours = (row: AttendanceDraft) =>
     hoursFor({
@@ -869,7 +879,7 @@ export function TimesheetsTab({
         next.inTime ||= "08:00";
         next.outTime ||= "17:00";
         next.breakHours ||= "1";
-        if (Number(next.manualHours) <= 0) {
+        if (Number(next.manualHours) <= 0 || Number.isNaN(Number(next.manualHours))) {
           next.manualHours = String(hoursFor(next).toFixed(2));
         }
       }
@@ -967,86 +977,9 @@ export function TimesheetsTab({
     );
   };
 
-  const openAssignedProject = (project: Project) => {
-    if (dirty && !confirmDiscard()) return;
-    if (assignmentsQuery.isLoading) {
-      notify("Project worker assignments are still loading.", "warn");
-      return;
-    }
-    if (assignmentsQuery.error) {
-      notify(
-        `Could not load project worker assignments: ${assignmentsQuery.error.message}`,
-        "warn",
-      );
-      return;
-    }
-    const foremanAccount = foremenQuery.data?.find((user) => user.user_id === currentUserId);
-    if (!foremanAccount) {
-      notify(
-        foremenQuery.error
-          ? `Could not load your foreman account: ${foremenQuery.error.message}`
-          : "Could not find your foreman account. Ask an administrator to check your account.",
-        "warn",
-      );
-      return;
-    }
-
-    const foremanName =
-      foremanAccount.full_name?.trim() || foremanAccount.email || "Unnamed foreman";
-    const projectEntries = timesheets.filter(
-      (entry) =>
-        (entry.project_id === project.id || entry.site === project.name) &&
-        (entry.foreman_user_id === currentUserId ||
-          entry.foreman === foremanName ||
-          (entry.foreman_user_id === null && entry.site === project.name)),
-    );
-    const entryIds = new Set(projectEntries.map((entry) => entry.employee_id));
-    const assignedEmployeeIds = (assignmentsQuery.data ?? [])
-      .filter(
-        (assignment) =>
-          assignment.project_id === project.id &&
-          (role !== "foreman" || assignment.foreman_user_id === currentUserId) &&
-          assignment.effective_from <= workDate &&
-          (!assignment.effective_to || assignment.effective_to >= workDate),
-      )
-      .map((assignment) => assignment.employee_id);
-    const candidateIds = new Set([...assignedEmployeeIds, ...entryIds]);
-    const employeeIds = [...candidateIds].filter((id) => {
-      if (!employeeById.has(id)) return false;
-      const existing = timesheets.find((entry) => entry.employee_id === id);
-      return !existing || entryIds.has(id);
-    });
-    const matchingBatch = savedBatches.find((batch) =>
-      batch.entries.some((entry) => entryIds.has(entry.employee_id)),
-    );
-
-    setSite(project.name);
-    setSelectedProjectId(project.id);
-    setForeman(foremanName);
-    setSelectedForemanId(currentUserId);
-    setEditingKey(matchingBatch?.key ?? null);
-    setSelectedIds(employeeIds);
-    setAttendance(
-      Object.fromEntries(
-        employeeIds.map((id) => {
-          const existing = timesheets.find(
-            (entry) =>
-              entry.employee_id === id && (entry.project_id === project.id || entryIds.has(id)),
-          );
-          return [id, existing ? attendanceFromRecord(existing) : defaultAttendance()];
-        }),
-      ),
-    );
-    setDirty(false);
-    setEmployeeSearch("");
-    setEmployeePickerOpen(false);
-    setCopyPickerOpen(false);
-  };
-
   const selectProject = (project: Project) => {
     if (dirty && !confirmDiscard()) return;
 
-    // 1. Check if worker assignments are still loading or errored out
     if (assignmentsQuery.isLoading) {
       notify("Project worker assignments are still loading.", "warn");
       return;
@@ -1059,20 +992,17 @@ export function TimesheetsTab({
       return;
     }
 
-    // 2. Find the foreman assigned to this project
     const assignedForeman = foremanOptions.find(
       (option) => option.userId === project.foreman_user_id,
     );
     const foremanName = assignedForeman?.name ?? "";
     const foremanUserId = assignedForeman?.userId ?? null;
 
-    // 3. Find any timesheet entries already saved for this project today
     const projectEntries = timesheets.filter(
       (entry) => entry.project_id === project.id || entry.site === project.name,
     );
     const entryIds = new Set(projectEntries.map((entry) => entry.employee_id));
 
-    // 4. Gather all employees officially assigned to this project on this date (for Admin & Foreman)
     const assignedEmployeeIds = (assignmentsQuery.data ?? [])
       .filter(
         (assignment) =>
@@ -1083,7 +1013,6 @@ export function TimesheetsTab({
       )
       .map((assignment) => assignment.employee_id);
 
-    // 5. Combine assigned workers and already-marked workers into one list
     const candidateIds = new Set([...assignedEmployeeIds, ...entryIds]);
     const employeeIds = [...candidateIds].filter((id) => {
       if (!employeeById.has(id)) return false;
@@ -1091,18 +1020,16 @@ export function TimesheetsTab({
       return !existing || entryIds.has(id);
     });
 
-    // 6. Check if there is an existing batch for these entries
     const matchingBatch = savedBatches.find((batch) =>
       batch.entries.some((entry) => entryIds.has(entry.employee_id)),
     );
 
-    // 7. Update the state so the project and its assigned employees instantly appear on screen!
     setSite(project.name);
     setSelectedProjectId(project.id);
     setForeman(foremanName);
     setSelectedForemanId(foremanUserId);
     setEditingKey(matchingBatch?.key ?? null);
-    setSelectedIds(employeeIds); // <-- Now populates the admin view automatically!
+    setSelectedIds(employeeIds);
     setAttendance(
       Object.fromEntries(
         employeeIds.map((id) => {
@@ -1156,8 +1083,8 @@ export function TimesheetsTab({
         const duration = (manualHours + breakHours) * 60;
         const [startHour, startMinute] = row.inTime.split(":").map(Number);
         const [endHour, endMinute] = row.outTime.split(":").map(Number);
-        const startMinutes = startHour! * 60 + startMinute!;
-        const endMinutes = endHour! * 60 + endMinute!;
+        const startMinutes = (startHour ?? 0) * 60 + (startMinute ?? 0);
+        const endMinutes = (endHour ?? 0) * 60 + (endMinute ?? 0);
         return (
           !Number.isFinite(manualHours) ||
           manualHours <= 0 ||
@@ -1172,8 +1099,8 @@ export function TimesheetsTab({
       }
       const start = row.inTime.split(":").map(Number);
       const end = row.outTime.split(":").map(Number);
-      const startMinutes = start[0]! * 60 + start[1]!;
-      const endMinutes = end[0]! * 60 + end[1]!;
+      const startMinutes = (start[0] ?? 0) * 60 + (start[1] ?? 0);
+      const endMinutes = (end[0] ?? 0) * 60 + (end[1] ?? 0);
       const visibleBreakHours = visibleColumns.breakHours ? Number(row.breakHours) : 0;
       const shiftHours = (endMinutes - startMinutes) / 60;
       return (
@@ -1203,11 +1130,11 @@ export function TimesheetsTab({
         const duration = Math.round((Number(row.manualHours) + breakHours) * 60);
         if (visibleColumns.inTime) {
           const [hours, minutes] = row.inTime.split(":").map(Number);
-          const endMinutes = hours! * 60 + minutes! + duration;
+          const endMinutes = (hours ?? 0) * 60 + (minutes ?? 0) + duration;
           outTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
         } else if (visibleColumns.outTime) {
           const [hours, minutes] = row.outTime.split(":").map(Number);
-          const startMinutes = hours! * 60 + minutes! - duration;
+          const startMinutes = (hours ?? 0) * 60 + (minutes ?? 0) - duration;
           inTime = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
         } else {
           inTime = "08:00";
