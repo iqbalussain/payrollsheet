@@ -1125,10 +1125,10 @@ export function MonthlyAttendanceDialog({
                   <span className="text-[11px] font-bold text-slate-500">Quick fill:</span>
                   <button
                     type="button"
-                    onClick={() => fillSingleSchedule("6day", "8")}
+                    onClick={() => fillSingleSchedule("6day", "11")}
                     className={`${btnOutline} h-7 rounded px-2 py-0.5 text-[11px]`}
                   >
-                    <Sparkles size={12} className="text-amber-600" /> 6-Day 8hrs (Fri off)
+                    <Sparkles size={12} className="text-amber-600" /> 6-Day 11hrs (Fri off)
                   </button>
                   <button
                     type="button"
