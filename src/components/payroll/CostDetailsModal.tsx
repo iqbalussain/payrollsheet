@@ -203,7 +203,7 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[1200px] text-xs">
+          <table className="w-full min-w-300 text-xs">
             <thead className="sticky top-0 z-10 bg-navy-soft">
               <tr className="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-3 py-2">Emp ID</th>
@@ -312,7 +312,7 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
 
         {detail && (
           <div
-            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
+            className="fixed inset-0 z-90 flex items-center justify-center bg-black/50 p-4"
             onClick={() => setDetail(null)}
           >
             <div className={card + " w-full max-w-md p-5"} onClick={(e) => e.stopPropagation()}>
