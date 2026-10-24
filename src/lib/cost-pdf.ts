@@ -38,18 +38,20 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
   );
 
   const cols: Array<[string, number, "l" | "r"]> = [
-    ["Emp ID", 18, "l"],
-    ["Employee", 32, "l"],
-    ["Trade", 20, "l"],
-    ["Site", 26, "l"],
-    ["Foreman", 24, "l"],
-    ["Month", 18, "l"],
-    ["Hours", 18, "r"],
-    ["Gross Sal", 24, "r"],
-    ["Food Ded", 23, "r"],
-    ["Adv Ded", 23, "r"],
-    ["Outst.", 24, "r"],
-    ["Net Pay", 27, "r"],
+    ["Emp ID", 15, "l"],
+    ["Employee", 28, "l"],
+    ["Trade", 16, "l"],
+    ["Site", 23, "l"],
+    ["Foreman", 22, "l"],
+    ["Month", 15, "l"],
+    ["Hours", 15, "r"],
+    ["Gross Sal", 20, "r"],
+    ["Food Ded", 19, "r"],
+    ["Adv Ded", 19, "r"],
+    ["Outst.", 19, "r"],
+    ["Net Pay", 22, "r"],
+    ["Paid", 21, "r"],
+    ["Balance", 23, "r"],
   ];
 
   const drawHead = (y: number) => {
@@ -98,6 +100,8 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
       fmt(r.advanceDeduction),
       fmt(r.outstanding),
       fmt(r.netPay),
+      fmt(r.paid),
+      fmt(r.balance),
     ];
     let x = L + 2;
     values.forEach((v, ci) => {
@@ -124,7 +128,7 @@ function buildDoc(rows: AllocationRow[], meta: CostReportMeta) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.text(
-    `Total staff: ${t.staff}   Hours: ${fmt(t.regularHours)}   Gross: ${fmt(t.grossSalary)} OMR   Food: ${fmt(t.foodDeduction)} OMR   Adv Ded: ${fmt(t.advanceDeduction)} OMR   Net: ${fmt(t.netPay)} OMR`,
+    `Total staff: ${t.staff}   Hours: ${fmt(t.regularHours)}   Gross: ${fmt(t.grossSalary)} OMR   Food: ${fmt(t.foodDeduction)} OMR   Adv: ${fmt(t.advanceDeduction)} OMR   Net: ${fmt(t.netPay)} OMR   Paid: ${fmt(t.paid)} OMR   Bal: ${fmt(t.balance)} OMR`,
     L,
     y,
   );

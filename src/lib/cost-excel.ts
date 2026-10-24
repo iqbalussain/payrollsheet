@@ -21,6 +21,8 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
     "Advance Deduction",
     "Outstanding",
     "Net Pay",
+    "Paid",
+    "Balance",
   ];
   const lines = rows.map((r) =>
     [
@@ -36,6 +38,8 @@ export function downloadCostExcel(rows: AllocationRow[], meta: CostReportMeta) {
       fmt(r.advanceDeduction),
       fmt(r.outstanding),
       fmt(r.netPay),
+      fmt(r.paid),
+      fmt(r.balance),
     ]
       .map(escapeCsv)
       .join(","),

@@ -100,10 +100,10 @@ function batchKey(site: string, foreman: string) {
 function defaultAttendance(): AttendanceDraft {
   return {
     status: "PRESENT",
-    inTime: "08:00",
-    outTime: "17:00",
+    inTime: "06:00",
+    outTime: "18:00",
     breakHours: "1",
-    manualHours: "10",
+    manualHours: "11",
     notes: "",
   };
 }
@@ -1226,6 +1226,7 @@ export function TimesheetsTab({
         in_time: doesWork ? inTime : null,
         out_time: doesWork ? outTime : null,
         break_hours: doesWork ? breakHours : 0,
+        overtime_hours: 0,
         remarks: row.notes.trim() || null,
       } satisfies Omit<TimesheetRecord, "id" | "created_at" | "total_hours" | "regular_hours">;
     });
@@ -2285,7 +2286,7 @@ export function TimesheetsTab({
           onSave={onSave}
           onOpenChange={setMonthlyAttendanceOpen}
           notify={notify}
-          initialProjectId={selectedProjectId}
+          initialProjectId={selectedProjectId ?? ""}
           initialForeman={foreman}
         />
       )}

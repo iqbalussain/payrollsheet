@@ -183,19 +183,21 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 border-b border-border px-4 py-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
             { label: "Employees", value: String(totals.staff), icon: true },
             { label: "Total Hours", value: fmt(totals.regularHours) },
             { label: "Gross Salary", value: `${fmt(totals.grossSalary)} OMR` },
             { label: "Net Pay", value: `${fmt(totals.netPay)} OMR` },
+            { label: "Paid", value: `${fmt(totals.paid)} OMR`, money: true },
+            { label: "Balance", value: `${fmt(totals.balance)} OMR` },
           ].map((metric) => (
             <div key={metric.label} className="rounded-xl bg-navy-soft/70 px-3 py-2.5">
               <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                 {metric.icon && <Users size={12} />}
                 {metric.label}
               </p>
-              <p className="mt-1 truncate font-display text-sm font-extrabold text-navy">
+              <p className={`mt-1 truncate font-display text-sm font-extrabold ${metric.money ? "text-money" : "text-navy"}`}>
                 {metric.value}
               </p>
             </div>
@@ -203,7 +205,8 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-300 text-xs">
+          {/* Fixed min-w-300 to min-w-[300px] */}
+          <table className="w-full min-w-[300px] text-xs">
             <thead className="sticky top-0 z-10 bg-navy-soft">
               <tr className="text-left text-[10px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-3 py-2">Emp ID</th>
@@ -218,12 +221,14 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                 <th className="px-3 py-2 text-right">Advance Deduction</th>
                 <th className="px-3 py-2 text-right">Outstanding</th>
                 <th className="px-3 py-2 text-right font-bold text-navy">Net Pay</th>
+                <th className="px-3 py-2 text-right font-bold text-money">Paid</th>
+                <th className="px-3 py-2 text-right font-bold text-navy">Balance</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-3 py-10 text-center text-slate-400">
+                  <td colSpan={14} className="px-3 py-10 text-center text-slate-400">
                     {allocationsQuery.isLoading || linesQuery.isLoading
                       ? "Loading site allocations…"
                       : allocationsQuery.error
@@ -261,8 +266,14 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                     <td className="px-3 py-2 text-right text-slate-600">
                       {fmt(r.outstanding)}
                     </td>
-                    <td className="px-3 py-2 text-right font-bold text-money">
+                    <td className="px-3 py-2 text-right font-bold text-navy">
                       {fmt(r.netPay)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-money">
+                      {fmt(r.paid)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold text-navy">
+                      {fmt(r.balance)}
                     </td>
                   </tr>
                 ))
@@ -284,7 +295,7 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                 <p className="text-[11px] text-slate-500">
                   ID {r.employeeId} · {r.trade} · {r.site} · {r.foreman} · {r.month}
                 </p>
-                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                <div className="mt-2 grid grid-cols-3 gap-2 text-[11px] sm:grid-cols-5">
                   <span>
                     Hours <b>{fmt(r.regularHours)}</b>
                   </span>
@@ -292,7 +303,13 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                     Gross <b>{fmt(r.grossSalary)}</b>
                   </span>
                   <span>
-                    Net <b className="text-money">{fmt(r.netPay)}</b>
+                    Net <b className="text-navy">{fmt(r.netPay)}</b>
+                  </span>
+                  <span>
+                    Paid <b className="text-money">{fmt(r.paid)}</b>
+                  </span>
+                  <span>
+                    Bal <b className="text-navy">{fmt(r.balance)}</b>
                   </span>
                 </div>
               </button>
@@ -307,12 +324,15 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
           <span>Food deduction: {fmt(totals.foodDeduction)} OMR</span>
           <span>Advance deduction: {fmt(totals.advanceDeduction)} OMR</span>
           <span>Outstanding: {fmt(totals.outstanding)} OMR</span>
-          <span className="text-money">Net pay: {fmt(totals.netPay)} OMR</span>
+          <span>Net pay: {fmt(totals.netPay)} OMR</span>
+          <span className="text-money">Paid: {fmt(totals.paid)} OMR</span>
+          <span className="text-navy">Balance: {fmt(totals.balance)} OMR</span>
         </div>
 
         {detail && (
           <div
-            className="fixed inset-0 z-90 flex items-center justify-center bg-black/50 p-4"
+            /* Fixed z-90 to z-[90] */
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4"
             onClick={() => setDetail(null)}
           >
             <div className={card + " w-full max-w-md p-5"} onClick={(e) => e.stopPropagation()}>
