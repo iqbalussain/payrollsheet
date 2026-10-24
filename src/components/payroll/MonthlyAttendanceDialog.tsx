@@ -352,6 +352,12 @@ export function MonthlyAttendanceDialog({
   const [entryMode, setEntryMode] = useState<"single" | "multiple">("single");
   const [month, setMonth] = useState(currentMonth);
 
+  // Searchable employee combobox state (single mode)
+  const [empSearch, setEmpSearch] = useState("");
+  const [empDropdownOpen, setEmpDropdownOpen] = useState(false);
+  const empSearchRef = useRef<HTMLInputElement>(null);
+  const empDropdownRef = useRef<HTMLDivElement>(null);
+
   // Column visibility options: In Time, Out Time, Break
   // By default, inTime, outTime, and breakHours are unchecked so users can easily enter total hours directly!
   const [visibleColumns, setVisibleColumns] = useState({
@@ -372,6 +378,40 @@ export function MonthlyAttendanceDialog({
   const [singleEmployeeId, setSingleEmployeeId] = useState("");
   const [days, setDays] = useState<Record<number, DayDraft>>({});
   const loadedContext = useRef("");
+
+  // Derive selected employee display label
+  const selectedEmployee = useMemo(
+    () => employeesByName.find((e) => String(e.id) === singleEmployeeId),
+    [singleEmployeeId, employeesByName],
+  );
+
+  // Filtered list for the combobox
+  const empSearchResults = useMemo(() => {
+    const q = empSearch.trim().toLowerCase();
+    if (!q) return employeesByName;
+    return employeesByName.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.id_number && e.id_number.toLowerCase().includes(q)) ||
+        (e.trade && e.trade.toLowerCase().includes(q)),
+    );
+  }, [empSearch, employeesByName]);
+
+  // Click-outside to close employee dropdown
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        empDropdownRef.current &&
+        !empDropdownRef.current.contains(e.target as Node) &&
+        empSearchRef.current &&
+        !empSearchRef.current.contains(e.target as Node)
+      ) {
+        setEmpDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Multiple employees state
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<number>>(new Set());
@@ -988,21 +1028,96 @@ export function MonthlyAttendanceDialog({
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-white px-4 py-2.5">
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs font-semibold text-slate-700">
-                  Select Employee:
-                  <select
-                    value={singleEmployeeId}
-                    onChange={(event) => setSingleEmployeeId(event.target.value)}
-                    className={`${select} ml-2 min-w-56 font-normal`}
-                  >
-                    <option value="">-- Choose Employee --</option>
-                    {employeesByName.map((employee) => (
-                      <option key={employee.id} value={employee.id}>
-                        {employee.name} · {employee.trade} ({employee.id_number || employee.id})
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="relative">
+                  <span className="text-xs font-semibold text-slate-700">Select Employee:</span>
+                  <div className="relative mt-1 min-w-72">
+                    {/* Search input */}
+                    <div className="relative flex items-center">
+                      <Search
+                        size={13}
+                        className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                      />
+                      <input
+                        ref={empSearchRef}
+                        type="text"
+                        value={empSearch}
+                        placeholder={
+                          selectedEmployee
+                            ? `${selectedEmployee.name} (${selectedEmployee.id_number || selectedEmployee.id})`
+                            : "Search by name or ID number…"
+                        }
+                        onFocus={() => {
+                          setEmpSearch("");
+                          setEmpDropdownOpen(true);
+                        }}
+                        onChange={(e) => {
+                          setEmpSearch(e.target.value);
+                          setEmpDropdownOpen(true);
+                        }}
+                        className={`${input} pl-8 pr-8 text-xs font-normal ${
+                          selectedEmployee ? "placeholder:text-navy placeholder:font-semibold" : ""
+                        }`}
+                        aria-label="Search employee"
+                        autoComplete="off"
+                      />
+                      {selectedEmployee && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSingleEmployeeId("");
+                            setEmpSearch("");
+                            setDays({});
+                            loadedContext.current = "";
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-danger"
+                          aria-label="Clear employee selection"
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown results */}
+                    {empDropdownOpen && (
+                      <div
+                        ref={empDropdownRef}
+                        className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-80 overflow-y-auto rounded-lg border border-border bg-white shadow-lg"
+                      >
+                        {empSearchResults.length === 0 ? (
+                          <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                            No employees match "{empSearch}".
+                          </p>
+                        ) : (
+                          empSearchResults.map((emp) => (
+                            <button
+                              key={emp.id}
+                              type="button"
+                              onClick={() => {
+                                setSingleEmployeeId(String(emp.id));
+                                setEmpSearch("");
+                                setEmpDropdownOpen(false);
+                                setDays({});
+                                loadedContext.current = "";
+                              }}
+                              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition hover:bg-navy-soft/60 ${
+                                String(emp.id) === singleEmployeeId
+                                  ? "bg-navy-soft font-bold text-navy"
+                                  : "text-slate-700"
+                              }`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate font-semibold">{emp.name}</p>
+                                <p className="text-[10px] text-slate-500">
+                                  ID: {emp.id_number || emp.id} · {emp.trade}
+                                </p>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {singleEmployeeId && (
