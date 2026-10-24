@@ -31,6 +31,14 @@ import { TimeControl } from "./TimeControl";
 type AttendanceStatus = TimesheetRecord["status"];
 type AttendanceEntry = Omit<TimesheetRecord, "id" | "created_at" | "total_hours" | "regular_hours">;
 
+type AttendanceColumn = "inTime" | "outTime" | "breakHours";
+
+const ATTENDANCE_COLUMNS: Array<{ value: AttendanceColumn; label: string }> = [
+  { value: "inTime", label: "In time" },
+  { value: "outTime", label: "Out time" },
+  { value: "breakHours", label: "Break" },
+];
+
 interface DayDraft {
   status: AttendanceStatus | "";
   site: string;
@@ -40,6 +48,7 @@ interface DayDraft {
   inTime: string;
   outTime: string;
   breakHours: string;
+  totalHours: string;
   overtime: string;
   remarks: string;
 }
@@ -80,16 +89,35 @@ function dayOfWeek(month: string, day: number) {
   return new Date(year!, monthNumber! - 1, day).getDay();
 }
 
+function calcDurationHours(inTime: string, outTime: string) {
+  if (!inTime || !outTime) return 0;
+  const [inH, inM] = inTime.split(":").map(Number);
+  const [outH, outM] = outTime.split(":").map(Number);
+  if (inH === undefined || outH === undefined) return 0;
+  return Math.max(0, (outH * 60 + outM - (inH * 60 + inM)) / 60);
+}
+
 function dayFromRecord(entry: TimesheetRecord): DayDraft {
+  const inTime = entry.in_time?.slice(0, 5) ?? "";
+  const outTime = entry.out_time?.slice(0, 5) ?? "";
+  const breakHours = String(entry.break_hours ?? 0);
+  const totalHours =
+    entry.total_hours != null
+      ? String(entry.total_hours)
+      : inTime && outTime
+        ? String(Math.max(0, calcDurationHours(inTime, outTime) - Number(breakHours)).toFixed(1))
+        : "8";
+
   return {
     status: entry.status,
     site: entry.site,
     projectId: entry.project_id ?? "",
     foreman: entry.foreman,
     foremanUserId: entry.foreman_user_id ?? "",
-    inTime: entry.in_time?.slice(0, 5) ?? "",
-    outTime: entry.out_time?.slice(0, 5) ?? "",
-    breakHours: String(entry.break_hours ?? 0),
+    inTime,
+    outTime,
+    breakHours,
+    totalHours,
     overtime: String(entry.overtime_hours ?? 0),
     remarks: entry.remarks ?? "",
   };
@@ -102,9 +130,10 @@ function emptyDay(): DayDraft {
     projectId: "",
     foreman: "",
     foremanUserId: "",
-    inTime: "",
-    outTime: "",
-    breakHours: "0",
+    inTime: "08:00",
+    outTime: "17:00",
+    breakHours: "1",
+    totalHours: "8",
     overtime: "0",
     remarks: "",
   };
@@ -120,6 +149,7 @@ interface MonthDayRowProps {
   row: DayDraft;
   projects: Array<{ id: string; name: string; active: boolean }>;
   foremanOptions: Array<{ value: string; userId: string | null; name: string; label: string }>;
+  visibleColumns: { inTime: boolean; outTime: boolean; breakHours: boolean };
   updateDay: (day: number, patch: Partial<DayDraft>) => void;
 }
 
@@ -129,17 +159,21 @@ const MonthDayRow = memo(function MonthDayRow({
   row,
   projects,
   foremanOptions,
+  visibleColumns,
   updateDay,
 }: MonthDayRowProps) {
   const isWorked = worked(row.status);
   const weekday = WEEKDAY_NAMES[dayOfWeek(month, day)];
   const isWeekend = weekday === "Fri";
+  const manualMode = !visibleColumns.inTime || !visibleColumns.outTime;
 
   return (
     <tr className={`border-t border-border ${isWeekend ? "bg-amber-50/40" : ""}`}>
       <td className="px-2 py-1.5 font-semibold text-navy whitespace-nowrap">
         <span className="font-bold">{day}</span>
-        <span className={`ml-1 text-[10px] ${isWeekend ? "text-amber-700 font-bold" : "text-muted-foreground"}`}>
+        <span
+          className={`ml-1 text-[10px] ${isWeekend ? "text-amber-700 font-bold" : "text-muted-foreground"}`}
+        >
           ({weekday})
         </span>
       </td>
@@ -213,34 +247,74 @@ const MonthDayRow = memo(function MonthDayRow({
           ))}
         </select>
       </td>
-      <td className="px-2 py-1.5">
-        <TimeControl
-          value={row.inTime}
-          disabled={!isWorked}
-          onChange={(value) => updateDay(day, { inTime: value })}
-          label={`Day ${day} in time`}
-        />
-      </td>
-      <td className="px-2 py-1.5">
-        <TimeControl
-          value={row.outTime}
-          disabled={!isWorked}
-          onChange={(value) => updateDay(day, { outTime: value })}
-          label={`Day ${day} out time`}
-        />
-      </td>
-      <td className="px-2 py-1.5">
-        <input
-          type="number"
-          min="0"
-          step="0.25"
-          value={row.breakHours}
-          disabled={!isWorked}
-          onChange={(event) => updateDay(day, { breakHours: event.target.value })}
-          aria-label={`Day ${day} break hours`}
-          className={`${input} w-16 px-1.5 py-1 text-right disabled:opacity-50`}
-        />
-      </td>
+
+      {/* When In Time is enabled */}
+      {visibleColumns.inTime && (
+        <td className="px-2 py-1.5">
+          <TimeControl
+            value={row.inTime}
+            disabled={!isWorked}
+            onChange={(value) => updateDay(day, { inTime: value })}
+            label={`Day ${day} in time`}
+          />
+        </td>
+      )}
+
+      {/* When Out Time is enabled */}
+      {visibleColumns.outTime && (
+        <td className="px-2 py-1.5">
+          <TimeControl
+            value={row.outTime}
+            disabled={!isWorked}
+            onChange={(value) => updateDay(day, { outTime: value })}
+            label={`Day ${day} out time`}
+          />
+        </td>
+      )}
+
+      {/* When Break is enabled */}
+      {visibleColumns.breakHours && (
+        <td className="px-2 py-1.5">
+          <input
+            type="number"
+            min="0"
+            step="0.25"
+            value={row.breakHours}
+            disabled={!isWorked}
+            onChange={(event) => updateDay(day, { breakHours: event.target.value })}
+            aria-label={`Day ${day} break hours`}
+            className={`${input} w-16 px-1.5 py-1 text-right disabled:opacity-50`}
+          />
+        </td>
+      )}
+
+      {/* Total Hours Input - Always editable when manual mode is active, or shows calculated hours */}
+      {manualMode ? (
+        <td className="px-2 py-1.5">
+          <input
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            value={row.totalHours}
+            disabled={!isWorked}
+            onChange={(event) =>
+              updateDay(day, {
+                totalHours: event.target.value,
+                status: row.status || "PRESENT",
+              })
+            }
+            aria-label={`Day ${day} total hours`}
+            placeholder="8"
+            className={`${input} w-20 px-2 py-1 font-bold text-navy text-right disabled:opacity-50`}
+          />
+        </td>
+      ) : (
+        <td className="px-2 py-1.5 text-right font-bold text-navy">
+          {isWorked ? (Number(row.totalHours) || 0).toFixed(1) : "0"}
+        </td>
+      )}
+
       <td className="px-2 py-1.5">
         <input
           type="number"
@@ -278,6 +352,18 @@ export function MonthlyAttendanceDialog({
   const [entryMode, setEntryMode] = useState<"single" | "multiple">("single");
   const [month, setMonth] = useState(currentMonth);
 
+  // Column visibility options: In Time, Out Time, Break
+  // By default, inTime, outTime, and breakHours are unchecked so users can easily enter total hours directly!
+  const [visibleColumns, setVisibleColumns] = useState({
+    inTime: false,
+    outTime: false,
+    breakHours: false,
+  });
+
+  const toggleColumn = (col: AttendanceColumn) => {
+    setVisibleColumns((prev) => ({ ...prev, [col]: !prev[col] }));
+  };
+
   // Default project and foreman for easy auto-filling
   const [defaultProjectId, setDefaultProjectId] = useState(initialProjectId);
   const [defaultForemanValue, setDefaultForemanValue] = useState("");
@@ -293,6 +379,7 @@ export function MonthlyAttendanceDialog({
 
   // Bulk schedule options
   const [bulkPattern, setBulkPattern] = useState<"6day" | "5day" | "all">("6day");
+  const [bulkDailyHours, setBulkDailyHours] = useState("8");
   const [bulkInTime, setBulkInTime] = useState("08:00");
   const [bulkOutTime, setBulkOutTime] = useState("17:00");
   const [bulkBreakHours, setBulkBreakHours] = useState("1");
@@ -421,15 +508,27 @@ export function MonthlyAttendanceDialog({
           next.foremanUserId = resolvedDefaultForeman.userId ?? "";
         }
 
+        // When times change, keep totalHours in sync
+        if (patch.inTime !== undefined || patch.outTime !== undefined || patch.breakHours !== undefined) {
+          const inT = patch.inTime !== undefined ? patch.inTime : next.inTime;
+          const outT = patch.outTime !== undefined ? patch.outTime : next.outTime;
+          const brk = Number(patch.breakHours !== undefined ? patch.breakHours : next.breakHours) || 0;
+          if (inT && outT) {
+            next.totalHours = String(Math.max(0, calcDurationHours(inT, outT) - brk).toFixed(1));
+          }
+        }
+
         if (patch.status && !worked(patch.status)) {
           next.inTime = "";
           next.outTime = "";
           next.breakHours = "0";
+          next.totalHours = "0";
           next.overtime = "0";
         } else if (patch.status && worked(patch.status)) {
           next.inTime ||= "08:00";
           next.outTime ||= "17:00";
           next.breakHours ||= "1";
+          next.totalHours ||= "8";
         }
         return { ...current, [day]: next };
       });
@@ -462,11 +561,12 @@ export function MonthlyAttendanceDialog({
   };
 
   // Fill single employee schedule
-  const fillSingleSchedule = (pattern: "6day" | "5day" | "all") => {
+  const fillSingleSchedule = (pattern: "6day" | "5day" | "all", hours = "8") => {
     const site = resolvedDefaultProject?.name ?? "";
     const projectId = resolvedDefaultProject?.id ?? "";
     const foreman = resolvedDefaultForeman?.name ?? "";
     const foremanUserId = resolvedDefaultForeman?.userId ?? "";
+    const numHours = Number(hours) || 8;
 
     const next: Record<number, DayDraft> = {};
     for (const day of calendarDays) {
@@ -479,6 +579,8 @@ export function MonthlyAttendanceDialog({
             : weekday !== 5 && weekday !== 6; // Friday & Saturday off
 
       if (isWorking) {
+        const endMinutes = 8 * 60 + numHours * 60;
+        const outTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
         next[day] = {
           status: "PRESENT",
           site,
@@ -486,8 +588,9 @@ export function MonthlyAttendanceDialog({
           foreman,
           foremanUserId,
           inTime: "08:00",
-          outTime: "17:00",
-          breakHours: "1",
+          outTime,
+          breakHours: "0",
+          totalHours: String(numHours),
           overtime: "0",
           remarks: "",
         };
@@ -501,13 +604,16 @@ export function MonthlyAttendanceDialog({
           inTime: "",
           outTime: "",
           breakHours: "0",
+          totalHours: "0",
           overtime: "0",
           remarks: "",
         };
       }
     }
     setDays(next);
-    notify(`Generated ${pattern === "6day" ? "6-day" : pattern === "5day" ? "5-day" : "all-day"} schedule for the month.`);
+    notify(
+      `Generated ${pattern === "6day" ? "6-day" : pattern === "5day" ? "5-day" : "all-day"} schedule (${numHours} hrs/day) for ${month}.`,
+    );
   };
 
   // Save handler for Single Employee
@@ -532,6 +638,8 @@ export function MonthlyAttendanceDialog({
     const fallbackForeman = resolvedDefaultForeman?.name || "";
     const fallbackForemanUserId = resolvedDefaultForeman?.userId || null;
 
+    const manualMode = !visibleColumns.inTime || !visibleColumns.outTime;
+
     const invalidDays = entries.filter(({ row }) => {
       const isWork = worked(row.status);
       const site = row.site.trim() || fallbackSite;
@@ -540,13 +648,18 @@ export function MonthlyAttendanceDialog({
       if (!site || !foreman) return true;
       if (!isWork) return false;
 
+      if (manualMode) {
+        const totalHrs = Number(row.totalHours);
+        return !Number.isFinite(totalHrs) || totalHrs <= 0 || totalHrs > 24;
+      }
+
       const [startHour, startMinute] = (row.inTime || "").split(":").map(Number);
       const [endHour, endMinute] = (row.outTime || "").split(":").map(Number);
       if (startHour === undefined || endHour === undefined) return true;
 
       const start = startHour * 60 + startMinute;
       const end = endHour * 60 + endMinute;
-      const breakHours = Number(row.breakHours);
+      const breakHours = visibleColumns.breakHours ? Number(row.breakHours) : 0;
       const overtime = Number(row.overtime);
       const shiftHours = (end - start) / 60;
 
@@ -558,14 +671,13 @@ export function MonthlyAttendanceDialog({
         breakHours < 0 ||
         breakHours > shiftHours ||
         !Number.isFinite(overtime) ||
-        overtime < 0 ||
-        overtime > shiftHours - breakHours
+        overtime < 0
       );
     });
 
     if (invalidDays.length) {
       notify(
-        `Check site, foreman, time, break, and overtime values for day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
+        `Check site, foreman, hours/time, and break values for day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
         "warn",
       );
       return;
@@ -574,6 +686,28 @@ export function MonthlyAttendanceDialog({
     const rows: AttendanceEntry[] = entries.map(({ day, row }) => {
       const date = `${month}-${String(day).padStart(2, "0")}`;
       const doesWork = worked(row.status);
+      const breakHours = visibleColumns.breakHours ? Number(row.breakHours) || 0 : 0;
+
+      let inTime = row.inTime;
+      let outTime = row.outTime;
+
+      if (doesWork && manualMode) {
+        const durationMinutes = Math.round((Number(row.totalHours || 8) + breakHours) * 60);
+        if (visibleColumns.inTime && row.inTime) {
+          const [h, m] = row.inTime.split(":").map(Number);
+          const endM = h * 60 + m + durationMinutes;
+          outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
+        } else if (visibleColumns.outTime && row.outTime) {
+          const [h, m] = row.outTime.split(":").map(Number);
+          const startM = Math.max(0, h * 60 + m - durationMinutes);
+          inTime = `${String(Math.floor(startM / 60)).padStart(2, "0")}:${String(startM % 60).padStart(2, "0")}`;
+        } else {
+          inTime = "08:00";
+          const endM = 8 * 60 + durationMinutes;
+          outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
+        }
+      }
+
       return {
         employee_id: Number(singleEmployeeId),
         site: row.site.trim() || fallbackSite,
@@ -582,9 +716,9 @@ export function MonthlyAttendanceDialog({
         foreman_user_id: row.foremanUserId || fallbackForemanUserId,
         work_date: date,
         status: row.status as AttendanceStatus,
-        in_time: doesWork ? row.inTime : null,
-        out_time: doesWork ? row.outTime : null,
-        break_hours: doesWork ? Number(row.breakHours) || 0 : 0,
+        in_time: doesWork ? inTime : null,
+        out_time: doesWork ? outTime : null,
+        break_hours: doesWork ? breakHours : 0,
         overtime_hours: doesWork ? Number(row.overtime) || 0 : 0,
         remarks: row.remarks.trim() || null,
       };
@@ -614,13 +748,34 @@ export function MonthlyAttendanceDialog({
       return;
     }
 
-    // Validate times for working status
+    const manualMode = !visibleColumns.inTime || !visibleColumns.outTime;
+    const breakHours = visibleColumns.breakHours ? Number(bulkBreakHours) || 0 : 0;
+
+    let inTime = bulkInTime;
+    let outTime = bulkOutTime;
+
     if (worked(bulkWorkingStatus)) {
-      const [startHour, startMinute] = bulkInTime.split(":").map(Number);
-      const [endHour, endMinute] = bulkOutTime.split(":").map(Number);
-      if (startHour === undefined || endHour === undefined || endHour * 60 + endMinute <= startHour * 60 + startMinute) {
-        notify("Check that out time is after in time.", "warn");
-        return;
+      if (manualMode) {
+        const totalHrs = Number(bulkDailyHours);
+        if (!Number.isFinite(totalHrs) || totalHrs <= 0 || totalHrs > 24) {
+          notify("Enter a valid daily total hours (e.g. 8).", "warn");
+          return;
+        }
+        const durationMinutes = Math.round((totalHrs + breakHours) * 60);
+        inTime = "08:00";
+        const endM = 8 * 60 + durationMinutes;
+        outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
+      } else {
+        const [startHour, startMinute] = bulkInTime.split(":").map(Number);
+        const [endHour, endMinute] = bulkOutTime.split(":").map(Number);
+        if (
+          startHour === undefined ||
+          endHour === undefined ||
+          endHour * 60 + endMinute <= startHour * 60 + startMinute
+        ) {
+          notify("Check that out time is after in time.", "warn");
+          return;
+        }
       }
     }
 
@@ -649,9 +804,9 @@ export function MonthlyAttendanceDialog({
           foreman_user_id: resolvedDefaultForeman.userId,
           work_date: date,
           status,
-          in_time: doesWork ? bulkInTime : null,
-          out_time: doesWork ? bulkOutTime : null,
-          break_hours: doesWork ? Number(bulkBreakHours) || 0 : 0,
+          in_time: doesWork ? inTime : null,
+          out_time: doesWork ? outTime : null,
+          break_hours: doesWork ? breakHours : 0,
           overtime_hours: doesWork ? Number(bulkOvertimeHours) || 0 : 0,
           remarks: null,
         });
@@ -693,10 +848,12 @@ export function MonthlyAttendanceDialog({
     });
   };
 
+  const isManualHoursMode = !visibleColumns.inTime || !visibleColumns.outTime;
+
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="fixed left-[50%] top-[50%] z-[100] flex h-[94vh] max-h-[94vh] w-[98vw] max-w-[98vw] translate-x-[-50%] translate-y-[-50%] flex-col gap-0 overflow-hidden p-0 sm:rounded-xl">
-        <DialogHeader className="border-b border-border bg-white px-5 py-3.5 pr-12 text-left">
+        <DialogHeader className="border-b border-border bg-white px-5 py-3 pr-12 text-left">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <DialogTitle className="font-display text-xl font-extrabold text-navy">
@@ -707,7 +864,7 @@ export function MonthlyAttendanceDialog({
               </DialogDescription>
             </div>
             {/* Mode Toggle */}
-            <div className="flex overflow-hidden rounded-lg border border-slate-300 text-xs font-semibold">
+            <div className="flex overflow-hidden rounded-lg border border-slate-300 text-xs font-semibold shadow-xs">
               <button
                 type="button"
                 onClick={() => setEntryMode("single")}
@@ -735,7 +892,7 @@ export function MonthlyAttendanceDialog({
         </DialogHeader>
 
         {/* Global Configuration Bar: Month, Default Project, Default Foreman */}
-        <div className="grid grid-cols-1 gap-3 border-b border-border bg-navy-soft/60 px-4 py-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 border-b border-border bg-navy-soft/60 px-4 py-2.5 sm:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
             <span className="flex items-center gap-1">
               <CalendarDays size={13} className="text-slate-400" />
@@ -787,6 +944,38 @@ export function MonthlyAttendanceDialog({
           </label>
         </div>
 
+        {/* ATTENDANCE COLUMNS OPTION TOOLBAR */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-slate-100/80 px-4 py-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Attendance columns:
+            </span>
+            {ATTENDANCE_COLUMNS.map(({ value, label }) => (
+              <label
+                key={value}
+                className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={visibleColumns[value]}
+                  onChange={() => toggleColumn(value)}
+                  className="h-4 w-4 rounded accent-navy"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          {isManualHoursMode ? (
+            <span className="text-[11px] font-semibold text-emerald-700">
+              ✓ Total hours mode active: enter total hours directly for each day.
+            </span>
+          ) : (
+            <span className="text-[11px] font-medium text-slate-500">
+              Shift times mode: In/Out times active. Uncheck to enter total hours directly.
+            </span>
+          )}
+        </div>
+
         {/* Errors display */}
         {timesheetsQuery.error && (
           <p className="m-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
@@ -821,14 +1010,21 @@ export function MonthlyAttendanceDialog({
                   <span className="text-[11px] font-bold text-slate-500">Quick fill:</span>
                   <button
                     type="button"
-                    onClick={() => fillSingleSchedule("6day")}
+                    onClick={() => fillSingleSchedule("6day", "8")}
                     className={`${btnOutline} h-7 rounded px-2 py-0.5 text-[11px]`}
                   >
-                    <Sparkles size={12} className="text-amber-600" /> 6-Day (Fri off)
+                    <Sparkles size={12} className="text-amber-600" /> 6-Day 8hrs (Fri off)
                   </button>
                   <button
                     type="button"
-                    onClick={() => fillSingleSchedule("5day")}
+                    onClick={() => fillSingleSchedule("6day", "10")}
+                    className={`${btnOutline} h-7 rounded px-2 py-0.5 text-[11px]`}
+                  >
+                    <Sparkles size={12} className="text-amber-600" /> 6-Day 10hrs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillSingleSchedule("5day", "8")}
                     className={`${btnOutline} h-7 rounded px-2 py-0.5 text-[11px]`}
                   >
                     <Sparkles size={12} className="text-amber-600" /> 5-Day (Fri-Sat off)
@@ -866,16 +1062,19 @@ export function MonthlyAttendanceDialog({
                 </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-border shadow-sm">
-                  <table className="w-full min-w-[1250px] text-left text-xs">
+                  <table className="w-full min-w-[1050px] text-left text-xs">
                     <thead className="sticky top-0 z-10 bg-navy-soft text-[10px] uppercase tracking-wide text-slate-600">
                       <tr>
                         <th className="px-2 py-2">Day</th>
                         <th className="px-2 py-2">Status</th>
                         <th className="px-2 py-2">Site / project</th>
                         <th className="px-2 py-2">Foreman</th>
-                        <th className="px-2 py-2">In Time</th>
-                        <th className="px-2 py-2">Out Time</th>
-                        <th className="px-2 py-2">Break (hrs)</th>
+                        {visibleColumns.inTime && <th className="px-2 py-2">In Time</th>}
+                        {visibleColumns.outTime && <th className="px-2 py-2">Out Time</th>}
+                        {visibleColumns.breakHours && <th className="px-2 py-2">Break (hrs)</th>}
+                        <th className="px-2 py-2 text-right">
+                          {isManualHoursMode ? "Total Hours (hrs)" : "Total hrs"}
+                        </th>
                         <th className="px-2 py-2">Overtime (hrs)</th>
                         <th className="w-28 px-2 py-2">Remarks</th>
                       </tr>
@@ -891,6 +1090,7 @@ export function MonthlyAttendanceDialog({
                             row={row}
                             projects={projects}
                             foremanOptions={foremanOptions}
+                            visibleColumns={visibleColumns}
                             updateDay={updateDay}
                           />
                         );
@@ -925,7 +1125,7 @@ export function MonthlyAttendanceDialog({
                   <button
                     type="button"
                     onClick={toggleSelectAllFiltered}
-                    className="flex items-center gap-1 font-semibold text-navy hover:underline"
+                    className="flex items-center gap-1 font-semibold text-navy hover:underline cursor-pointer"
                   >
                     <CheckSquare size={13} />
                     {filteredEmployees.every((e) => selectedEmployeeIds.has(e.id))
@@ -947,7 +1147,7 @@ export function MonthlyAttendanceDialog({
                         key={emp.id}
                         type="button"
                         onClick={() => toggleEmployeeSelection(emp.id)}
-                        className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition ${
+                        className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition cursor-pointer ${
                           isSelected
                             ? "border-navy bg-navy-soft/80 shadow-xs"
                             : "border-border/60 bg-white hover:bg-slate-50"
@@ -1001,14 +1201,16 @@ export function MonthlyAttendanceDialog({
                         key={pat.id}
                         type="button"
                         onClick={() => setBulkPattern(pat.id as typeof bulkPattern)}
-                        className={`rounded-lg border p-3 text-left transition ${
+                        className={`rounded-lg border p-3 text-left transition cursor-pointer ${
                           bulkPattern === pat.id
                             ? "border-navy bg-navy text-white shadow-xs"
                             : "border-border bg-white text-slate-700 hover:bg-slate-50"
                         }`}
                       >
                         <p className="text-xs font-bold">{pat.label}</p>
-                        <p className={`mt-0.5 text-[10px] ${bulkPattern === pat.id ? "text-slate-200" : "text-muted-foreground"}`}>
+                        <p
+                          className={`mt-0.5 text-[10px] ${bulkPattern === pat.id ? "text-slate-200" : "text-muted-foreground"}`}
+                        >
                           {pat.desc}
                         </p>
                       </button>
@@ -1047,50 +1249,83 @@ export function MonthlyAttendanceDialog({
                 <div className={`${card} space-y-3 p-4`}>
                   <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Clock size={14} className="text-slate-500" />
-                    Standard Working Shift Hours
+                    {isManualHoursMode ? "Daily Total Working Hours" : "Standard Shift Hours"}
                   </p>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <label className="text-xs text-slate-600">
-                      In Time
-                      <input
-                        type="time"
-                        value={bulkInTime}
-                        onChange={(e) => setBulkInTime(e.target.value)}
-                        className={`${input} mt-1`}
-                      />
-                    </label>
-                    <label className="text-xs text-slate-600">
-                      Out Time
-                      <input
-                        type="time"
-                        value={bulkOutTime}
-                        onChange={(e) => setBulkOutTime(e.target.value)}
-                        className={`${input} mt-1`}
-                      />
-                    </label>
-                    <label className="text-xs text-slate-600">
-                      Break (hours)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={bulkBreakHours}
-                        onChange={(e) => setBulkBreakHours(e.target.value)}
-                        className={`${input} mt-1 text-right`}
-                      />
-                    </label>
-                    <label className="text-xs text-slate-600">
-                      Overtime (hours)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.5"
-                        value={bulkOvertimeHours}
-                        onChange={(e) => setBulkOvertimeHours(e.target.value)}
-                        className={`${input} mt-1 text-right`}
-                      />
-                    </label>
-                  </div>
+
+                  {isManualHoursMode ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <label className="text-xs text-slate-600">
+                        Total Daily Hours
+                        <input
+                          type="number"
+                          min="1"
+                          max="24"
+                          step="0.5"
+                          value={bulkDailyHours}
+                          onChange={(e) => setBulkDailyHours(e.target.value)}
+                          placeholder="8"
+                          className={`${input} mt-1 font-bold text-navy`}
+                        />
+                        <span className="text-[10px] text-muted-foreground">
+                          e.g. 8 hrs, 10 hrs per working day
+                        </span>
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Overtime (hours/day)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={bulkOvertimeHours}
+                          onChange={(e) => setBulkOvertimeHours(e.target.value)}
+                          className={`${input} mt-1 text-right`}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <label className="text-xs text-slate-600">
+                        In Time
+                        <input
+                          type="time"
+                          value={bulkInTime}
+                          onChange={(e) => setBulkInTime(e.target.value)}
+                          className={`${input} mt-1`}
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Out Time
+                        <input
+                          type="time"
+                          value={bulkOutTime}
+                          onChange={(e) => setBulkOutTime(e.target.value)}
+                          className={`${input} mt-1`}
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Break (hours)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={bulkBreakHours}
+                          onChange={(e) => setBulkBreakHours(e.target.value)}
+                          className={`${input} mt-1 text-right`}
+                        />
+                      </label>
+                      <label className="text-xs text-slate-600">
+                        Overtime (hours)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={bulkOvertimeHours}
+                          onChange={(e) => setBulkOvertimeHours(e.target.value)}
+                          className={`${input} mt-1 text-right`}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 {/* Summary calculation box */}
