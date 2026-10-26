@@ -29,14 +29,13 @@ import { btnGold, btnOutline, btnPrimary, card, input, select } from "./ui";
 import { TimeControl } from "./TimeControl";
 
 type AttendanceStatus = TimesheetRecord["status"];
-type AttendanceEntry = Omit<TimesheetRecord, "id" | "created_at" | "total_hours" | "regular_hours">;
+type AttendanceEntry = Omit<TimesheetRecord, "id" | "created_at" | "regular_hours" | "break_hours" | "overtime_hours">;
 
-type AttendanceColumn = "inTime" | "outTime" | "breakHours";
+type AttendanceColumn = "inTime" | "outTime";
 
 const ATTENDANCE_COLUMNS: Array<{ value: AttendanceColumn; label: string }> = [
   { value: "inTime", label: "In time" },
   { value: "outTime", label: "Out time" },
-  { value: "breakHours", label: "Break" },
 ];
 
 interface DayDraft {
@@ -47,9 +46,7 @@ interface DayDraft {
   foremanUserId: string;
   inTime: string;
   outTime: string;
-  breakHours: string;
   totalHours: string;
-  overtime: string;
   remarks: string;
 }
 
@@ -100,12 +97,11 @@ function calcDurationHours(inTime: string, outTime: string) {
 function dayFromRecord(entry: TimesheetRecord): DayDraft {
   const inTime = entry.in_time?.slice(0, 5) ?? "";
   const outTime = entry.out_time?.slice(0, 5) ?? "";
-  const breakHours = String(entry.break_hours ?? 0);
   const totalHours =
     entry.total_hours != null
       ? String(entry.total_hours)
       : inTime && outTime
-        ? String(Math.max(0, calcDurationHours(inTime, outTime) - Number(breakHours)).toFixed(1))
+        ? String(Math.max(0, calcDurationHours(inTime, outTime)).toFixed(1))
         : "8";
 
   return {
@@ -116,9 +112,7 @@ function dayFromRecord(entry: TimesheetRecord): DayDraft {
     foremanUserId: entry.foreman_user_id ?? "",
     inTime,
     outTime,
-    breakHours,
     totalHours,
-    overtime: String(entry.overtime_hours ?? 0),
     remarks: entry.remarks ?? "",
   };
 }
@@ -132,9 +126,7 @@ function emptyDay(): DayDraft {
     foremanUserId: "",
     inTime: "08:00",
     outTime: "17:00",
-    breakHours: "1",
     totalHours: "8",
-    overtime: "0",
     remarks: "",
   };
 }
@@ -149,7 +141,7 @@ interface MonthDayRowProps {
   row: DayDraft;
   projects: Array<{ id: string; name: string; active: boolean }>;
   foremanOptions: Array<{ value: string; userId: string | null; name: string; label: string }>;
-  visibleColumns: { inTime: boolean; outTime: boolean; breakHours: boolean };
+  visibleColumns: { inTime: boolean; outTime: boolean };
   updateDay: (day: number, patch: Partial<DayDraft>) => void;
 }
 
@@ -186,9 +178,9 @@ const MonthDayRow = memo(function MonthDayRow({
             })
           }
           aria-label={`Day ${day} status`}
-          className={`${select} min-w-32 px-2 py-1`}
+          className={`${select} min-w-28 px-2 py-1`}
         >
-          <option value="">Not recorded</option>
+          <option value="">--</option>
           {ATTENDANCE_STATUSES.map((status) => (
             <option key={status.value} value={status.value}>
               {status.label}
@@ -211,9 +203,9 @@ const MonthDayRow = memo(function MonthDayRow({
             });
           }}
           aria-label={`Day ${day} site`}
-          className={`${select} min-w-36 px-2 py-1`}
+          className={`${select} min-w-32 px-2 py-1`}
         >
-          <option value="">Choose project</option>
+          <option value="">Project</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
               {project.name}
@@ -237,9 +229,9 @@ const MonthDayRow = memo(function MonthDayRow({
             });
           }}
           aria-label={`Day ${day} foreman`}
-          className={`${select} min-w-36 px-2 py-1`}
+          className={`${select} min-w-32 px-2 py-1`}
         >
-          <option value="">Choose foreman</option>
+          <option value="">Foreman</option>
           {foremanOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -248,7 +240,6 @@ const MonthDayRow = memo(function MonthDayRow({
         </select>
       </td>
 
-      {/* When In Time is enabled */}
       {visibleColumns.inTime && (
         <td className="px-2 py-1.5">
           <TimeControl
@@ -260,7 +251,6 @@ const MonthDayRow = memo(function MonthDayRow({
         </td>
       )}
 
-      {/* When Out Time is enabled */}
       {visibleColumns.outTime && (
         <td className="px-2 py-1.5">
           <TimeControl
@@ -272,23 +262,6 @@ const MonthDayRow = memo(function MonthDayRow({
         </td>
       )}
 
-      {/* When Break is enabled */}
-      {visibleColumns.breakHours && (
-        <td className="px-2 py-1.5">
-          <input
-            type="number"
-            min="0"
-            step="0.25"
-            value={row.breakHours}
-            disabled={!isWorked}
-            onChange={(event) => updateDay(day, { breakHours: event.target.value })}
-            aria-label={`Day ${day} break hours`}
-            className={`${input} w-16 px-1.5 py-1 text-right disabled:opacity-50`}
-          />
-        </td>
-      )}
-
-      {/* Total Hours Input - Always editable when manual mode is active, or shows calculated hours */}
       {manualMode ? (
         <td className="px-2 py-1.5">
           <input
@@ -306,7 +279,7 @@ const MonthDayRow = memo(function MonthDayRow({
             }
             aria-label={`Day ${day} total hours`}
             placeholder="8"
-            className={`${input} w-20 px-2 py-1 font-bold text-navy text-right disabled:opacity-50`}
+            className={`${input} w-16 px-1.5 py-1 font-bold text-navy text-right disabled:opacity-50`}
           />
         </td>
       ) : (
@@ -315,18 +288,6 @@ const MonthDayRow = memo(function MonthDayRow({
         </td>
       )}
 
-      <td className="px-2 py-1.5">
-        <input
-          type="number"
-          min="0"
-          step="0.25"
-          value={row.overtime}
-          disabled={!isWorked}
-          onChange={(event) => updateDay(day, { overtime: event.target.value })}
-          aria-label={`Day ${day} overtime hours`}
-          className={`${input} w-16 px-1.5 py-1 text-right disabled:opacity-50`}
-        />
-      </td>
       <td className="px-2 py-1.5">
         <input
           value={row.remarks}
@@ -352,43 +313,34 @@ export function MonthlyAttendanceDialog({
   const [entryMode, setEntryMode] = useState<"single" | "multiple">("single");
   const [month, setMonth] = useState(currentMonth);
 
-  // Searchable employee combobox state (single mode)
   const [empSearch, setEmpSearch] = useState("");
   const [empDropdownOpen, setEmpDropdownOpen] = useState(false);
   const empSearchRef = useRef<HTMLInputElement>(null);
   const empDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Column visibility options: In Time, Out Time, Break
   const [visibleColumns, setVisibleColumns] = useState({
     inTime: false,
     outTime: false,
-    breakHours: false,
   });
 
   const toggleColumn = (col: AttendanceColumn) => {
     setVisibleColumns((prev) => ({ ...prev, [col]: !prev[col] }));
   };
 
-  // Default project and foreman for easy auto-filling
   const [defaultProjectId, setDefaultProjectId] = useState(initialProjectId);
   const [defaultForemanValue, setDefaultForemanValue] = useState("");
 
-  // Single employee state
   const [singleEmployeeId, setSingleEmployeeId] = useState("");
   const [days, setDays] = useState<Record<number, DayDraft>>({});
   const loadedContext = useRef("");
 
-  // Multiple employees state
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<number>>(new Set());
   const [employeeSearch, setEmployeeSearch] = useState("");
 
-  // Bulk schedule options
   const [bulkPattern, setBulkPattern] = useState<"6day" | "5day" | "all">("6day");
   const [bulkDailyHours, setBulkDailyHours] = useState("8");
   const [bulkInTime, setBulkInTime] = useState("08:00");
   const [bulkOutTime, setBulkOutTime] = useState("17:00");
-  const [bulkBreakHours, setBulkBreakHours] = useState("1");
-  const [bulkOvertimeHours, setBulkOvertimeHours] = useState("0");
   const [bulkWorkingStatus, setBulkWorkingStatus] = useState<AttendanceStatus>("PRESENT");
   const [bulkOffStatus, setBulkOffStatus] = useState<AttendanceStatus>("WEEKLY_OFF");
 
@@ -413,10 +365,14 @@ export function MonthlyAttendanceDialog({
     },
   });
 
+  const totalMonthDays = daysInMonth(month);
   const calendarDays = useMemo(
-    () => Array.from({ length: daysInMonth(month) }, (_, index) => index + 1),
-    [month],
+    () => Array.from({ length: totalMonthDays }, (_, index) => index + 1),
+    [totalMonthDays],
   );
+
+  const daysFirstHalf = useMemo(() => calendarDays.filter((d) => d <= 16), [calendarDays]);
+  const daysSecondHalf = useMemo(() => calendarDays.filter((d) => d > 16), [calendarDays]);
 
   const employeesByName = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name)),
@@ -540,25 +496,21 @@ export function MonthlyAttendanceDialog({
           next.foremanUserId = resolvedDefaultForeman.userId ?? "";
         }
 
-        if (patch.inTime !== undefined || patch.outTime !== undefined || patch.breakHours !== undefined) {
+        if (patch.inTime !== undefined || patch.outTime !== undefined) {
           const inT = patch.inTime !== undefined ? patch.inTime : next.inTime;
           const outT = patch.outTime !== undefined ? patch.outTime : next.outTime;
-          const brk = Number(patch.breakHours !== undefined ? patch.breakHours : next.breakHours) || 0;
           if (inT && outT) {
-            next.totalHours = String(Math.max(0, calcDurationHours(inT, outT) - brk).toFixed(1));
+            next.totalHours = String(Math.max(0, calcDurationHours(inT, outT)).toFixed(1));
           }
         }
 
         if (patch.status && !worked(patch.status)) {
           next.inTime = "";
           next.outTime = "";
-          next.breakHours = "0";
           next.totalHours = "0";
-          next.overtime = "0";
         } else if (patch.status && worked(patch.status)) {
           next.inTime ||= "08:00";
           next.outTime ||= "17:00";
-          next.breakHours ||= "1";
           next.totalHours ||= "8";
         }
         return { ...current, [day]: next };
@@ -618,9 +570,7 @@ export function MonthlyAttendanceDialog({
           foremanUserId,
           inTime: "08:00",
           outTime,
-          breakHours: "0",
           totalHours: String(numHours),
-          overtime: "0",
           remarks: "",
         };
       } else {
@@ -632,9 +582,7 @@ export function MonthlyAttendanceDialog({
           foremanUserId,
           inTime: "",
           outTime: "",
-          breakHours: "0",
           totalHours: "0",
-          overtime: "0",
           remarks: "",
         };
       }
@@ -687,25 +635,19 @@ export function MonthlyAttendanceDialog({
 
       const start = startHour * 60 + startMinute;
       const end = endHour * 60 + endMinute;
-      const breakHours = visibleColumns.breakHours ? Number(row.breakHours) : 0;
-      const overtime = Number(row.overtime);
       const shiftHours = (end - start) / 60;
 
       return (
         !row.inTime ||
         !row.outTime ||
         end <= start ||
-        !Number.isFinite(breakHours) ||
-        breakHours < 0 ||
-        breakHours > shiftHours ||
-        !Number.isFinite(overtime) ||
-        overtime < 0
+        shiftHours <= 0
       );
     });
 
     if (invalidDays.length) {
       notify(
-        `Check site, foreman, hours/time, and break values for day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
+        `Check site, foreman, hours/time values for day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
         "warn",
       );
       return;
@@ -714,13 +656,12 @@ export function MonthlyAttendanceDialog({
     const rows: AttendanceEntry[] = entries.map(({ day, row }) => {
       const date = `${month}-${String(day).padStart(2, "0")}`;
       const doesWork = worked(row.status);
-      const breakHours = visibleColumns.breakHours ? Number(row.breakHours) || 0 : 0;
 
       let inTime = row.inTime;
       let outTime = row.outTime;
 
       if (doesWork && manualMode) {
-        const durationMinutes = Math.round((Number(row.totalHours || 8) + breakHours) * 60);
+        const durationMinutes = Math.round(Number(row.totalHours || 8) * 60);
         if (visibleColumns.inTime && row.inTime) {
           const [h, m = 0] = row.inTime.split(":").map(Number);
           if (h !== undefined) {
@@ -750,8 +691,7 @@ export function MonthlyAttendanceDialog({
         status: row.status as AttendanceStatus,
         in_time: doesWork ? inTime : null,
         out_time: doesWork ? outTime : null,
-        break_hours: doesWork ? breakHours : 0,
-        overtime_hours: doesWork ? Number(row.overtime) || 0 : 0,
+        total_hours: doesWork ? Number(row.totalHours) || 0 : 0,
         remarks: row.remarks.trim() || null,
       };
     });
@@ -780,10 +720,10 @@ export function MonthlyAttendanceDialog({
     }
 
     const manualMode = !visibleColumns.inTime || !visibleColumns.outTime;
-    const breakHours = visibleColumns.breakHours ? Number(bulkBreakHours) || 0 : 0;
 
     let inTime = bulkInTime;
     let outTime = bulkOutTime;
+    let totalHours = Number(bulkDailyHours) || 8;
 
     if (worked(bulkWorkingStatus)) {
       if (manualMode) {
@@ -792,9 +732,9 @@ export function MonthlyAttendanceDialog({
           notify("Enter a valid daily total hours (e.g. 8).", "warn");
           return;
         }
-        const durationMinutes = Math.round((totalHrs + breakHours) * 60);
+        totalHours = totalHrs;
         inTime = "08:00";
-        const endM = 8 * 60 + durationMinutes;
+        const endM = 8 * 60 + Math.round(totalHrs * 60);
         outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
       } else {
         const [startHour, startMinute = 0] = bulkInTime.split(":").map(Number);
@@ -807,6 +747,7 @@ export function MonthlyAttendanceDialog({
           notify("Check that out time is after in time.", "warn");
           return;
         }
+        totalHours = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60;
       }
     }
 
@@ -837,8 +778,7 @@ export function MonthlyAttendanceDialog({
           status,
           in_time: doesWork ? inTime : null,
           out_time: doesWork ? outTime : null,
-          break_hours: doesWork ? breakHours : 0,
-          overtime_hours: doesWork ? Number(bulkOvertimeHours) || 0 : 0,
+          total_hours: doesWork ? totalHours : 0,
           remarks: null,
         });
       }
@@ -894,7 +834,6 @@ export function MonthlyAttendanceDialog({
                 Record monthly attendance for an individual employee or in bulk for multiple employees.
               </DialogDescription>
             </div>
-            {/* Mode Toggle */}
             <div className="flex overflow-hidden rounded-lg border border-slate-300 text-xs font-semibold shadow-xs">
               <button
                 type="button"
@@ -922,7 +861,6 @@ export function MonthlyAttendanceDialog({
           </div>
         </DialogHeader>
 
-        {/* Global Configuration Bar: Month, Default Project, Default Foreman */}
         <div className="grid grid-cols-1 gap-3 border-b border-border bg-navy-soft/60 px-4 py-2.5 sm:grid-cols-3">
           <label className="text-xs font-semibold text-slate-600">
             <span className="flex items-center gap-1">
@@ -975,7 +913,6 @@ export function MonthlyAttendanceDialog({
           </label>
         </div>
 
-        {/* ATTENDANCE COLUMNS OPTION TOOLBAR */}
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-slate-100/80 px-4 py-2">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
             <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -1007,14 +944,12 @@ export function MonthlyAttendanceDialog({
           )}
         </div>
 
-        {/* Errors display */}
         {timesheetsQuery.error && (
           <p className="m-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
             Could not load monthly attendance: {timesheetsQuery.error.message}
           </p>
         )}
 
-        {/* MODE: SINGLE EMPLOYEE */}
         {entryMode === "single" && (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-white px-4 py-2.5">
@@ -1165,49 +1100,88 @@ export function MonthlyAttendanceDialog({
                   Loading attendance for {month}…
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-lg border border-border shadow-sm">
-                  <table className="w-full min-w-[1050px] text-left text-xs">
-                    <thead className="sticky top-0 z-10 bg-navy-soft text-[10px] uppercase tracking-wide text-slate-600">
-                      <tr>
-                        <th className="px-2 py-2">Day</th>
-                        <th className="px-2 py-2">Status</th>
-                        <th className="px-2 py-2">Site / project</th>
-                        <th className="px-2 py-2">Foreman</th>
-                        {visibleColumns.inTime && <th className="px-2 py-2">In Time</th>}
-                        {visibleColumns.outTime && <th className="px-2 py-2">Out Time</th>}
-                        {visibleColumns.breakHours && <th className="px-2 py-2">Break (hrs)</th>}
-                        <th className="px-2 py-2 text-right">
-                          {isManualHoursMode ? "Total Hours (hrs)" : "Total hrs"}
-                        </th>
-                        <th className="px-2 py-2">Overtime (hrs)</th>
-                        <th className="w-28 px-2 py-2">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {calendarDays.map((day) => {
-                        const row = days[day] ?? emptyDay();
-                        return (
-                          <MonthDayRow
-                            key={day}
-                            day={day}
-                            month={month}
-                            row={row}
-                            projects={projects}
-                            foremanOptions={foremanOptions}
-                            visibleColumns={visibleColumns}
-                            updateDay={updateDay}
-                          />
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  <div className="overflow-x-auto rounded-lg border border-border shadow-sm bg-white">
+                    <div className="bg-navy-soft px-3 py-2 text-xs font-bold text-navy border-b border-border flex justify-between items-center">
+                      <span>Days 1 – 16</span>
+                      <span className="text-[10px] text-slate-500">First Half of Month</span>
+                    </div>
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-600 border-b border-border">
+                        <tr>
+                          <th className="px-2 py-2">Day</th>
+                          <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2">Site</th>
+                          <th className="px-2 py-2">Foreman</th>
+                          {visibleColumns.inTime && <th className="px-2 py-2">In</th>}
+                          {visibleColumns.outTime && <th className="px-2 py-2">Out</th>}
+                          <th className="px-2 py-2 text-right">{isManualHoursMode ? "Hours" : "Tot"}</th>
+                          <th className="px-2 py-2">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {daysFirstHalf.map((day) => {
+                          const row = days[day] ?? emptyDay();
+                          return (
+                            <MonthDayRow
+                              key={day}
+                              day={day}
+                              month={month}
+                              row={row}
+                              projects={projects}
+                              foremanOptions={foremanOptions}
+                              visibleColumns={visibleColumns}
+                              updateDay={updateDay}
+                            />
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-lg border border-border shadow-sm bg-white">
+                    <div className="bg-navy-soft px-3 py-2 text-xs font-bold text-navy border-b border-border flex justify-between items-center">
+                      <span>Days 17 – {totalMonthDays}</span>
+                      <span className="text-[10px] text-slate-500">Second Half of Month</span>
+                    </div>
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-600 border-b border-border">
+                        <tr>
+                          <th className="px-2 py-2">Day</th>
+                          <th className="px-2 py-2">Status</th>
+                          <th className="px-2 py-2">Site</th>
+                          <th className="px-2 py-2">Foreman</th>
+                          {visibleColumns.inTime && <th className="px-2 py-2">In</th>}
+                          {visibleColumns.outTime && <th className="px-2 py-2">Out</th>}
+                          <th className="px-2 py-2 text-right">{isManualHoursMode ? "Hours" : "Tot"}</th>
+                          <th className="px-2 py-2">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {daysSecondHalf.map((day) => {
+                          const row = days[day] ?? emptyDay();
+                          return (
+                            <MonthDayRow
+                              key={day}
+                              day={day}
+                              month={month}
+                              row={row}
+                              projects={projects}
+                              foremanOptions={foremanOptions}
+                              visibleColumns={visibleColumns}
+                              updateDay={updateDay}
+                            />
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
 
-        {/* MODE: MULTIPLE EMPLOYEES */}
         {entryMode === "multiple" && (
           <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-12">
             <div className="flex h-full flex-col border-b border-border md:col-span-5 md:border-b-0 md:border-r">
@@ -1284,7 +1258,7 @@ export function MonthlyAttendanceDialog({
                     Bulk Attendance Configuration
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    This schedule will be populated for all {selectedEmployeeIds.size} selected employee(s) across all {daysInMonth(month)} days of {month}.
+                    This schedule will be populated for all {selectedEmployeeIds.size} selected employee(s) across all {calendarDays.length} days of {month}.
                   </p>
                 </div>
 
@@ -1370,20 +1344,9 @@ export function MonthlyAttendanceDialog({
                           e.g. 8 hrs, 10 hrs per working day
                         </span>
                       </label>
-                      <label className="text-xs text-slate-600">
-                        Overtime (hours/day)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={bulkOvertimeHours}
-                          onChange={(e) => setBulkOvertimeHours(e.target.value)}
-                          className={`${input} mt-1 text-right`}
-                        />
-                      </label>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
                       <label className="text-xs text-slate-600">
                         In Time
                         <input
@@ -1400,28 +1363,6 @@ export function MonthlyAttendanceDialog({
                           value={bulkOutTime}
                           onChange={(e) => setBulkOutTime(e.target.value)}
                           className={`${input} mt-1`}
-                        />
-                      </label>
-                      <label className="text-xs text-slate-600">
-                        Break (hours)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={bulkBreakHours}
-                          onChange={(e) => setBulkBreakHours(e.target.value)}
-                          className={`${input} mt-1 text-right`}
-                        />
-                      </label>
-                      <label className="text-xs text-slate-600">
-                        Overtime (hours)
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          value={bulkOvertimeHours}
-                          onChange={(e) => setBulkOvertimeHours(e.target.value)}
-                          className={`${input} mt-1 text-right`}
                         />
                       </label>
                     </div>
@@ -1460,7 +1401,6 @@ export function MonthlyAttendanceDialog({
           </div>
         )}
 
-        {/* Footer */}
         <DialogFooter className="border-t border-border bg-slate-50 px-4 py-3">
           <button
             type="button"
