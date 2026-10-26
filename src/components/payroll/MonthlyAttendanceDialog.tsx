@@ -91,8 +91,8 @@ function dayOfWeek(month: string, day: number) {
 
 function calcDurationHours(inTime: string, outTime: string) {
   if (!inTime || !outTime) return 0;
-  const [inH, inM] = inTime.split(":").map(Number);
-  const [outH, outM] = outTime.split(":").map(Number);
+  const [inH, inM = 0] = inTime.split(":").map(Number);
+  const [outH, outM = 0] = outTime.split(":").map(Number);
   if (inH === undefined || outH === undefined) return 0;
   return Math.max(0, (outH * 60 + outM - (inH * 60 + inM)) / 60);
 }
@@ -418,19 +418,16 @@ export function MonthlyAttendanceDialog({
     [month],
   );
 
-  // Defined BEFORE any useMemo that depends on it (fixing the ReferenceError)
   const employeesByName = useMemo(
     () => [...employees].sort((a, b) => a.name.localeCompare(b.name)),
     [employees],
   );
 
-  // Derive selected employee display label
   const selectedEmployee = useMemo(
     () => employeesByName.find((e) => String(e.id) === singleEmployeeId),
     [singleEmployeeId, employeesByName],
   );
 
-  // Filtered list for the combobox
   const empSearchResults = useMemo(() => {
     const q = empSearch.trim().toLowerCase();
     if (!q) return employeesByName;
@@ -453,7 +450,6 @@ export function MonthlyAttendanceDialog({
     );
   }, [employeeSearch, employeesByName]);
 
-  // Click-outside to close employee dropdown
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
@@ -497,7 +493,6 @@ export function MonthlyAttendanceDialog({
     return options;
   }, [employees, foremenQuery.data, timesheetsQuery.data]);
 
-  // Set initial foreman if provided
   useEffect(() => {
     if (initialForeman && foremanOptions.length && !defaultForemanValue) {
       const found = foremanOptions.find((f) => f.name.toLowerCase() === initialForeman.toLowerCase());
@@ -505,7 +500,6 @@ export function MonthlyAttendanceDialog({
     }
   }, [foremanOptions, initialForeman, defaultForemanValue]);
 
-  // Resolve selected default project & foreman
   const resolvedDefaultProject = useMemo(
     () => projects.find((p) => p.id === defaultProjectId),
     [defaultProjectId, projects],
@@ -515,7 +509,6 @@ export function MonthlyAttendanceDialog({
     [defaultForemanValue, foremanOptions],
   );
 
-  // Load existing timesheets when single employee or month changes
   useEffect(() => {
     if (!singleEmployeeId || timesheetsQuery.isLoading || timesheetsQuery.error) return;
     const context = `${month}:${singleEmployeeId}`;
@@ -538,7 +531,6 @@ export function MonthlyAttendanceDialog({
         const existing = current[day] ?? emptyDay();
         const next = { ...existing, ...patch };
 
-        // Auto-assign default project/foreman if empty
         if (patch.status && (!next.site || !next.projectId) && resolvedDefaultProject) {
           next.projectId = resolvedDefaultProject.id;
           next.site = resolvedDefaultProject.name;
@@ -548,7 +540,6 @@ export function MonthlyAttendanceDialog({
           next.foremanUserId = resolvedDefaultForeman.userId ?? "";
         }
 
-        // When times change, keep totalHours in sync
         if (patch.inTime !== undefined || patch.outTime !== undefined || patch.breakHours !== undefined) {
           const inT = patch.inTime !== undefined ? patch.inTime : next.inTime;
           const outT = patch.outTime !== undefined ? patch.outTime : next.outTime;
@@ -575,7 +566,6 @@ export function MonthlyAttendanceDialog({
     };
   }, [resolvedDefaultForeman, resolvedDefaultProject]);
 
-  // Apply default project & foreman to all days
   const applyDefaultsToAllDays = () => {
     if (!resolvedDefaultProject && !resolvedDefaultForeman) {
       notify("Select a default site/project or foreman first.", "warn");
@@ -600,7 +590,6 @@ export function MonthlyAttendanceDialog({
     notify("Applied default site and foreman to all days.");
   };
 
-  // Fill single employee schedule
   const fillSingleSchedule = (pattern: "6day" | "5day" | "all", hours = "8") => {
     const site = resolvedDefaultProject?.name ?? "";
     const projectId = resolvedDefaultProject?.id ?? "";
@@ -615,8 +604,8 @@ export function MonthlyAttendanceDialog({
         pattern === "all"
           ? true
           : pattern === "6day"
-            ? weekday !== 5 // Friday off
-            : weekday !== 5 && weekday !== 6; // Friday & Saturday off
+            ? weekday !== 5
+            : weekday !== 5 && weekday !== 6;
 
       if (isWorking) {
         const endMinutes = 8 * 60 + numHours * 60;
@@ -656,7 +645,6 @@ export function MonthlyAttendanceDialog({
     );
   };
 
-  // Save handler for Single Employee
   const saveSingle = async () => {
     if (!singleEmployeeId) {
       notify("Select an employee before saving monthly attendance.", "warn");
@@ -693,8 +681,8 @@ export function MonthlyAttendanceDialog({
         return !Number.isFinite(totalHrs) || totalHrs <= 0 || totalHrs > 24;
       }
 
-      const [startHour, startMinute] = (row.inTime || "").split(":").map(Number);
-      const [endHour, endMinute] = (row.outTime || "").split(":").map(Number);
+      const [startHour, startMinute = 0] = (row.inTime || "").split(":").map(Number);
+      const [endHour, endMinute = 0] = (row.outTime || "").split(":").map(Number);
       if (startHour === undefined || endHour === undefined) return true;
 
       const start = startHour * 60 + startMinute;
@@ -734,13 +722,17 @@ export function MonthlyAttendanceDialog({
       if (doesWork && manualMode) {
         const durationMinutes = Math.round((Number(row.totalHours || 8) + breakHours) * 60);
         if (visibleColumns.inTime && row.inTime) {
-          const [h, m] = row.inTime.split(":").map(Number);
-          const endM = h * 60 + m + durationMinutes;
-          outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
+          const [h, m = 0] = row.inTime.split(":").map(Number);
+          if (h !== undefined) {
+            const endM = h * 60 + m + durationMinutes;
+            outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
+          }
         } else if (visibleColumns.outTime && row.outTime) {
-          const [h, m] = row.outTime.split(":").map(Number);
-          const startM = Math.max(0, h * 60 + m - durationMinutes);
-          inTime = `${String(Math.floor(startM / 60)).padStart(2, "0")}:${String(startM % 60).padStart(2, "0")}`;
+          const [h, m = 0] = row.outTime.split(":").map(Number);
+          if (h !== undefined) {
+            const startM = Math.max(0, h * 60 + m - durationMinutes);
+            inTime = `${String(Math.floor(startM / 60)).padStart(2, "0")}:${String(Math.floor(startM % 60)).padStart(2, "0")}`;
+          }
         } else {
           inTime = "08:00";
           const endM = 8 * 60 + durationMinutes;
@@ -773,7 +765,6 @@ export function MonthlyAttendanceDialog({
     }
   };
 
-  // Save handler for Multiple Employees
   const saveMultiple = async () => {
     if (selectedEmployeeIds.size === 0) {
       notify("Select at least one employee.", "warn");
@@ -806,8 +797,8 @@ export function MonthlyAttendanceDialog({
         const endM = 8 * 60 + durationMinutes;
         outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
       } else {
-        const [startHour, startMinute] = bulkInTime.split(":").map(Number);
-        const [endHour, endMinute] = bulkOutTime.split(":").map(Number);
+        const [startHour, startMinute = 0] = bulkInTime.split(":").map(Number);
+        const [endHour, endMinute = 0] = bulkOutTime.split(":").map(Number);
         if (
           startHour === undefined ||
           endHour === undefined ||
@@ -829,8 +820,8 @@ export function MonthlyAttendanceDialog({
           bulkPattern === "all"
             ? true
             : bulkPattern === "6day"
-              ? weekday !== 5 // Friday off
-              : weekday !== 5 && weekday !== 6; // Friday & Saturday off
+              ? weekday !== 5
+              : weekday !== 5 && weekday !== 6;
 
         const status = isWorking ? bulkWorkingStatus : bulkOffStatus;
         const doesWork = worked(status);
@@ -1031,7 +1022,6 @@ export function MonthlyAttendanceDialog({
                 <div className="relative">
                   <span className="text-xs font-semibold text-slate-700">Select Employee:</span>
                   <div className="relative mt-1 min-w-72">
-                    {/* Search input */}
                     <div className="relative flex items-center">
                       <Search
                         size={13}
@@ -1077,7 +1067,6 @@ export function MonthlyAttendanceDialog({
                       )}
                     </div>
 
-                    {/* Dropdown results */}
                     {empDropdownOpen && (
                       <div
                         ref={empDropdownRef}
@@ -1221,7 +1210,6 @@ export function MonthlyAttendanceDialog({
         {/* MODE: MULTIPLE EMPLOYEES */}
         {entryMode === "multiple" && (
           <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-12">
-            {/* Left Column: Employee Multi-select (5 columns) */}
             <div className="flex h-full flex-col border-b border-border md:col-span-5 md:border-b-0 md:border-r">
               <div className="border-b border-border bg-slate-50 p-3">
                 <div className="relative">
@@ -1289,7 +1277,6 @@ export function MonthlyAttendanceDialog({
               </div>
             </div>
 
-            {/* Right Column: Bulk Schedule Configuration (7 columns) */}
             <div className="flex h-full flex-col overflow-y-auto p-5 md:col-span-7">
               <div className="space-y-4">
                 <div>
@@ -1301,7 +1288,6 @@ export function MonthlyAttendanceDialog({
                   </p>
                 </div>
 
-                {/* Pattern selection */}
                 <div className={`${card} space-y-3 p-4`}>
                   <label className="block text-xs font-bold text-slate-700">
                     Monthly Working Schedule Pattern
@@ -1360,7 +1346,6 @@ export function MonthlyAttendanceDialog({
                   </div>
                 </div>
 
-                {/* Working hours configuration */}
                 <div className={`${card} space-y-3 p-4`}>
                   <p className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
                     <Clock size={14} className="text-slate-500" />
@@ -1443,7 +1428,6 @@ export function MonthlyAttendanceDialog({
                   )}
                 </div>
 
-                {/* Summary calculation box */}
                 {selectedEmployeeIds.size > 0 && resolvedDefaultProject && resolvedDefaultForeman && (
                   <div className="rounded-xl border border-navy/20 bg-navy-soft/60 p-4">
                     <p className="text-xs font-bold uppercase tracking-wider text-navy">
