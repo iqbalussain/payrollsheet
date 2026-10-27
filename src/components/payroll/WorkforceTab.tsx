@@ -429,43 +429,6 @@ export function WorkforceTab({
           Could not load workforce records: {recordError.message}
         </div>
       )}
-      <section className={card + " space-y-3 p-4"}>
-        <h3 className="font-bold text-navy">Payroll policy</h3>
-        <p className="text-sm text-muted-foreground">
-          Overtime multiplier: {payrollSettings.data?.overtime_multiplier ?? "Not configured"}.
-          Existing saved lines retain their multiplier snapshot.
-        </p>
-        {isAdmin && (
-          <div className="flex flex-wrap gap-3">
-            <input
-              className={input}
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="Multiplier (e.g. 1.5)"
-              value={overtimeMultiplier}
-              onChange={(e) => setOvertimeMultiplier(e.target.value)}
-            />
-            <button
-              className={btnGold}
-              disabled={savePayrollSettings.isPending}
-              onClick={() => savePayrollSettings.mutate()}
-            >
-              Save multiplier
-            </button>
-            <button
-              className={btnOutline}
-              disabled={savePayrollSettings.isPending}
-              onClick={() => {
-                setOvertimeMultiplier("");
-                savePayrollSettings.mutate();
-              }}
-            >
-              Disable overtime
-            </button>
-          </div>
-        )}
-      </section>
       <section className={card + " space-y-4 p-4"}>
         <h3 className="flex items-center gap-2 font-bold text-navy">
           <Clock3 size={17} />
