@@ -2210,7 +2210,9 @@ export function TimesheetsTab({
         <MonthlyAttendanceDialog
           employees={employees}
           saving={saving}
-          onSave={onSave}
+          onSave={(rows) =>
+            onSave(rows.map((r) => ({ break_hours: 0, overtime_hours: 0, ...r })))
+          }
           onOpenChange={setMonthlyAttendanceOpen}
           notify={notify}
           initialProjectId={selectedProjectId ?? ""}
