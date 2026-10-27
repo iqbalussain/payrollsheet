@@ -666,7 +666,8 @@ export function PayrollTab({
     setDraft({ id: "", month, site: "", foreman: "", status: "DRAFT", lines: [emptyLine()] });
   };
 
-  const generateFromTimesheets = () => {
+  const [preview, setPreview] = useState<{ month: string; lines: PayrollLine[] } | null>(null);
+  const generateFromTimesheets = (previewOnly = false) => {
     if (batchesQuery.error || advanceBalancesQuery.error || salaryHistoryQuery.error) {
       notify(
         `Could not load payroll safeguards: ${
@@ -838,6 +839,11 @@ export function PayrollTab({
       return;
     }
 
+    if (previewOnly) {
+      setPreview({ month, lines });
+      return;
+    }
+    setPreview(null);
     setImportErrors([]);
     setSubmitError("");
     const missingAttendance = employees.filter(
@@ -1253,7 +1259,87 @@ export function PayrollTab({
           </select>
         </div>
         <button
-          onClick={generateFromTimesheets}
+          onClick={() => generateFromTimesheets(true)}
+          disabled={timesheetsLoading || Boolean(timesheetsError)}
+          className={btnOutline}
+        >
+          <Clock3 size={15} /> Preview Payroll
+        </button>
+        {preview && (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-3"
+            onClick={() => setPreview(null)}
+          >
+            <div
+              className={card + " flex max-h-[90vh] w-full max-w-3xl flex-col p-4"}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-extrabold text-navy">Payroll preview</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {monthLabel(preview.month)} · {preview.lines.length} employee(s) · regular rate only
+                  </p>
+                </div>
+                <button onClick={() => setPreview(null)} className={btnOutline} aria-label="Close preview">
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-auto">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-navy-soft">
+                    <tr className="text-left text-[10px] font-bold uppercase text-muted-foreground">
+                      <th className="px-2 py-2">Employee</th>
+                      <th className="px-2 py-2 text-right">Hours</th>
+                      <th className="px-2 py-2 text-right">Rate</th>
+                      <th className="px-2 py-2 text-right">Salary (OMR)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.lines.map((l) => {
+                      const emp = employees.find((e) => e.id === l.employee_id);
+                      return (
+                        <tr key={l.employee_id} className="border-b border-border">
+                          <td className="px-2 py-1.5 font-semibold text-navy">
+                            {emp?.name ?? `#${l.employee_id}`}
+                            <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                              {emp?.id_number?.trim() || "Not Assigned"}
+                            </span>
+                          </td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.hours))}</td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.rate))}</td>
+                          <td className="px-2 py-1.5 text-right font-bold text-navy">
+                            {fmt(toNum(l.gross_pay ?? l.regular_pay ?? 0))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-navy-soft/60 font-bold text-navy">
+                      <td className="px-2 py-2">Total</td>
+                      <td className="px-2 py-2 text-right">
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.hours), 0))}
+                      </td>
+                      <td />
+                      <td className="px-2 py-2 text-right">
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.gross_pay ?? l.regular_pay ?? 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div className="mt-3 flex justify-end gap-2">
+                <button onClick={() => setPreview(null)} className={btnOutline}>Cancel</button>
+                <button onClick={() => generateFromTimesheets(false)} className={btnGold}>
+                  Generate payroll
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => generateFromTimesheets()}
           disabled={timesheetsLoading || Boolean(timesheetsError)}
           className={btnOutline}
         >
