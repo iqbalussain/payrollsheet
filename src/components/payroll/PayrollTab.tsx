@@ -705,8 +705,8 @@ export function PayrollTab({
         overtimeHours: 0,
         foremen: new Set<string>(),
       };
-      total.regularHours += Number(entry.regular_hours);
-      total.overtimeHours += Number(entry.overtime_hours);
+      // No overtime: every worked hour is paid at the regular rate.
+      total.regularHours += Number(entry.regular_hours) + Number(entry.overtime_hours ?? 0);
       total.foremen.add(entry.foreman);
       totals.set(entry.employee_id, total);
     });
@@ -733,8 +733,8 @@ export function PayrollTab({
       monthlyEntries
         .filter((entry) => entry.employee_id === employee.id)
         .forEach((entry) => {
-          const regularHours = Number(entry.regular_hours ?? 0);
-          const overtimeHours = Number(entry.overtime_hours ?? 0);
+          const regularHours = Number(entry.regular_hours ?? 0) + Number(entry.overtime_hours ?? 0);
+          const overtimeHours = 0;
           if (regularHours + overtimeHours <= 0) return;
           const rate = effectiveRateOnDate(employee.id, entry.work_date, salaryHistory);
           if (rate === undefined || rate <= 0) {
