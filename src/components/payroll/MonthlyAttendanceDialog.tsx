@@ -59,9 +59,9 @@ interface AttendanceSaveError {
 
 function attendanceSaveError(error: unknown): AttendanceSaveError {
   const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
-  const message = typeof value.message === "string" ? value.message : typeof error === "string" ? error : "The save could not be completed.";
-  const code = typeof value.code === "string" ? value.code : undefined;
-  const details = [value.details, value.hint].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(" · ");
+  const message = typeof value["message"] === "string" ? value["message"] : typeof error === "string" ? error : "The save could not be completed.";
+  const code = typeof value["code"] === "string" ? value["code"] : undefined;
+  const details = [value["details"], value["hint"]].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(" · ");
   let action = "Keep this window open and try saving again. If it fails again, share the error details with your payroll administrator.";
   if (code === "23514") action = "Check the reported date: Present/Half day needs valid hours and an Out time after In time. Other statuses must have no shift hours.";
   else if (code === "23503") action = "Reselect the employee, site and foreman; one of the selected records may have been removed or changed.";
@@ -71,7 +71,7 @@ function attendanceSaveError(error: unknown): AttendanceSaveError {
   else if (code === "428C9" || code === "PGRST204") action = "The attendance fields do not match the saved-record format. Share these details with your payroll administrator; changing hours will not fix this.";
   else if (/fetch|network|offline|connection|timeout/i.test(message)) action = "Check your internet connection, then retry. If the previous request reached the server, review saved attendance before making changes.";
   else if (code === "22007" || code === "22008") action = "Check the attendance date and times. Use a valid date and times between 00:00 and 23:59.";
-  return { message, action, details: details || undefined, code };
+  return { message, action, ...(details ? { details } : {}), ...(code ? { code } : {}) };
 }
 
 interface Props {
