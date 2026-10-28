@@ -50,6 +50,30 @@ interface DayDraft {
   remarks: string;
 }
 
+interface AttendanceSaveError {
+  message: string;
+  action: string;
+  details?: string;
+  code?: string;
+}
+
+function attendanceSaveError(error: unknown): AttendanceSaveError {
+  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const message = typeof value.message === "string" ? value.message : typeof error === "string" ? error : "The save could not be completed.";
+  const code = typeof value.code === "string" ? value.code : undefined;
+  const details = [value.details, value.hint].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(" · ");
+  let action = "Keep this window open and try saving again. If it fails again, share the error details with your payroll administrator.";
+  if (code === "23514") action = "Check the reported date: Present/Half day needs valid hours and an Out time after In time. Other statuses must have no shift hours.";
+  else if (code === "23503") action = "Reselect the employee, site and foreman; one of the selected records may have been removed or changed.";
+  else if (code === "23505") action = "Review this employee’s saved attendance for the reported date and edit the existing entry instead of adding a duplicate.";
+  else if (code === "42501" || /permission denied|row-level security/i.test(message)) action = "Ask your payroll administrator to check your attendance-saving permission and project assignment, then retry.";
+  else if (code === "PGRST301" || code === "PGRST302" || /jwt.*expired|invalid.*jwt/i.test(message)) action = "Your sign-in has expired. Note your unsaved entries before signing in again, then retry.";
+  else if (code === "428C9" || code === "PGRST204") action = "The attendance fields do not match the saved-record format. Share these details with your payroll administrator; changing hours will not fix this.";
+  else if (/fetch|network|offline|connection|timeout/i.test(message)) action = "Check your internet connection, then retry. If the previous request reached the server, review saved attendance before making changes.";
+  else if (code === "22007" || code === "22008") action = "Check the attendance date and times. Use a valid date and times between 00:00 and 23:59.";
+  return { message, action, details: details || undefined, code };
+}
+
 interface Props {
   employees: Employee[];
   saving: boolean;
@@ -332,6 +356,7 @@ export function MonthlyAttendanceDialog({
 
   const [singleEmployeeId, setSingleEmployeeId] = useState("");
   const [days, setDays] = useState<Record<number, DayDraft>>({});
+  const [saveError, setSaveError] = useState<AttendanceSaveError | null>(null);
   const loadedContext = useRef("");
 
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<Set<number>>(new Set());
@@ -594,7 +619,9 @@ export function MonthlyAttendanceDialog({
   };
 
   const saveSingle = async () => {
+    setSaveError(null);
     if (!singleEmployeeId) {
+      setSaveError({ message: "No employee selected.", action: "Search for and select an employee before saving." });
       notify("Select an employee before saving monthly attendance.", "warn");
       return;
     }
@@ -605,6 +632,7 @@ export function MonthlyAttendanceDialog({
     });
 
     if (!entries.length) {
+      setSaveError({ message: "No attendance days selected.", action: "Choose an attendance status for at least one day, then save again." });
       notify("Record attendance status for at least one day.", "warn");
       return;
     }
@@ -646,6 +674,10 @@ export function MonthlyAttendanceDialog({
     });
 
     if (invalidDays.length) {
+      setSaveError({
+        message: `Check day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
+        action: "Select a site and foreman for each marked day (or set defaults above). For working days, enter valid positive hours or an Out time after In time.",
+      });
       notify(
         `Check site, foreman, hours/time values for day(s) ${invalidDays.map(({ day }) => day).join(", ")}.`,
         "warn",
@@ -700,7 +732,9 @@ export function MonthlyAttendanceDialog({
       notify(`${rows.length} attendance record(s) saved for ${month}.`);
       onOpenChange(false);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Could not save monthly attendance.", "warn");
+      const failure = attendanceSaveError(error);
+      setSaveError(failure);
+      notify(failure.message, "warn");
     }
   };
 
@@ -950,6 +984,20 @@ export function MonthlyAttendanceDialog({
 
         {entryMode === "single" && (
           <div className="flex min-h-0 flex-1 flex-col">
+            {saveError && (
+              <div role="alert" className="shrink-0 max-h-40 overflow-y-auto border-b border-danger/30 bg-danger/10 px-4 py-3 text-xs text-danger">
+                <p className="font-bold">Attendance save failed{selectedEmployee ? ` · ${selectedEmployee.name} · ${month}` : ""}</p>
+                <p className="mt-1 break-words">{saveError.message}</p>
+                <p className="mt-1 font-semibold break-words">{saveError.action}</p>
+                {(saveError.code || saveError.details) && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer font-semibold">Error details</summary>
+                    {saveError.code && <p className="mt-1">Code: {saveError.code}</p>}
+                    {saveError.details && <p className="mt-1 break-words whitespace-pre-wrap">{saveError.details}</p>}
+                  </details>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-white px-4 py-2.5">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
