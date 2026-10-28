@@ -29,7 +29,7 @@ import { btnGold, btnOutline, btnPrimary, card, input, select } from "./ui";
 import { TimeControl } from "./TimeControl";
 
 type AttendanceStatus = TimesheetRecord["status"];
-type AttendanceEntry = Omit<TimesheetRecord, "id" | "created_at" | "regular_hours" | "break_hours" | "overtime_hours">;
+type AttendanceEntry = Omit<TimesheetRecord, "id" | "created_at" | "total_hours" | "regular_hours" | "break_hours" | "overtime_hours">;
 
 type AttendanceColumn = "inTime" | "outTime";
 
@@ -691,7 +691,6 @@ export function MonthlyAttendanceDialog({
         status: row.status as AttendanceStatus,
         in_time: doesWork ? inTime : null,
         out_time: doesWork ? outTime : null,
-        total_hours: doesWork ? Number(row.totalHours) || 0 : 0,
         remarks: row.remarks.trim() || null,
       };
     });
@@ -778,7 +777,6 @@ export function MonthlyAttendanceDialog({
           status,
           in_time: doesWork ? inTime : null,
           out_time: doesWork ? outTime : null,
-          total_hours: doesWork ? totalHours : 0,
           remarks: null,
         });
       }
