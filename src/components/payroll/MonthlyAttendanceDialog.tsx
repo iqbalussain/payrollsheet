@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, memo } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Building2,
@@ -116,6 +116,12 @@ function calcDurationHours(inTime: string, outTime: string) {
   const [outH, outM = 0] = outTime.split(":").map(Number);
   if (inH === undefined || outH === undefined) return 0;
   return Math.max(0, (outH * 60 + outM - (inH * 60 + inM)) / 60);
+}
+
+function addHours(inTime: string, hours: number) {
+  const [h = 0, m = 0] = inTime.split(":").map(Number);
+  const total = (Math.round(h * 60 + m + hours * 60) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function dayFromRecord(entry: TimesheetRecord): DayDraft {
