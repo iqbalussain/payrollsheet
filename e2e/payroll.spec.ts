@@ -810,6 +810,48 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await page.screenshot({ path: testInfo.outputPath("saved-attendance.png") });
 });
 
+for (const code of ["23514", "42501", "23503", "23505"]) {
+  test(`individual attendance retains entries and allows retry after ${code}`, async ({ page }, testInfo) => {
+    const backend = await mockPayrollBackend(page, "admin");
+    let rejectSave = true;
+    await page.route(`${supabaseUrl}/rest/v1/timesheets**`, async (route) => {
+      if (route.request().method() !== "POST" || !rejectSave) {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({ status: 400, json: {
+        code,
+        message: "Attendance could not be accepted.",
+        details: "The selected attendance date requires review.",
+        hint: "Check the selected record.",
+      } });
+    });
+    await page.goto("/");
+    await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
+    await openTab(page, "Daily Timesheets", false);
+    await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Search employee").fill("Asha");
+    await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+    await dialog.getByLabel("Day 1 status").selectOption("PRESENT");
+    await dialog.getByLabel("Day 1 site").selectOption(northCampusId);
+    await dialog.getByLabel("Day 1 foreman").selectOption(foremanUserId);
+    await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    await dialog.getByText("Error details", { exact: true }).click();
+    await page.screenshot({ path: testInfo.outputPath(`attendance-error-${code}.png`) });
+    expect(backend.state.timesheets).toHaveLength(0);
+    await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
+    await expect(dialog.getByLabel("Day 1 site")).toHaveValue(northCampusId);
+    rejectSave = false;
+    await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
+    await expect(dialog).toBeHidden();
+    expect(backend.state.timesheets).toHaveLength(1);
+    expect(backend.state.timesheets[0]?.["employee_id"]).toBe(1);
+    expect(backend.state.timesheets[0]?.["status"]).toBe("PRESENT");
+  });
+}
+
 test("attendance batches can save direct total hours without shift columns", async ({ page }) => {
   const backend = await mockPayrollBackend(page, "admin");
   await page.setViewportSize({ width: 1440, height: 960 });
