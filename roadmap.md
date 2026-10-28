@@ -1,3 +1,4 @@
 - [ ] Update Cost Allocation list, details and exports to requested salary breakdown.
 - [ ] Add compact Daily Attendance search/status filtering without altering selection or saving.
 - [ ] Update vulnerable PDF dependency and verify relevant checks.
+- [x] Correct individual monthly attendance saving and verify saved entries reload without submitting calculated database fields.

@@ -191,6 +191,13 @@ async function mockPayrollBackend(
         const requestBody = request.postDataJSON() as
           Record<string, unknown> | Array<Record<string, unknown>>;
         const rows = Array.isArray(requestBody) ? requestBody : [requestBody];
+        if (table === "timesheets" && rows.some((row) => "total_hours" in row || "regular_hours" in row)) {
+          await route.fulfill({
+            status: 400,
+            json: { code: "428C9", message: "cannot insert a non-DEFAULT value into generated column" },
+          });
+          return;
+        }
         const created = rows.map((row) => ({
           id: row["id"] ?? randomUUID(),
           created_at: timestamp,
@@ -758,29 +765,49 @@ test("daily timesheet date changes keep the editor open and load the same batch"
   await expect(page.getByLabel("Foreman")).toHaveValue("legacy:Samir");
 });
 
-test("monthly attendance entry saves only days with a selected status", async ({ page }) => {
+test("monthly attendance entry saves only days with a selected status", async ({ page }, testInfo) => {
   const backend = await mockPayrollBackend(page, "admin");
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Daily Timesheets", false);
-  await page.getByRole("button", { name: "Monthly employee entry" }).click();
+  await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Monthly attendance entry")).toBeVisible();
-  await dialog.getByLabel("Employee").selectOption("1");
+  await dialog.getByLabel("Search employee").fill("Asha");
+  await dialog.getByRole("button", { name: /Asha Khan/ }).click();
   await dialog.getByLabel("Day 1 status").selectOption("PRESENT");
   await dialog.getByLabel("Day 1 site").selectOption(northCampusId);
   await dialog.getByLabel("Day 1 foreman").selectOption(foremanUserId);
-  await dialog.getByRole("button", { name: "Save monthly attendance" }).click();
+  await dialog.getByLabel("Day 2 status").selectOption("ABSENT");
+  await dialog.getByLabel("Day 2 site").selectOption(northCampusId);
+  await dialog.getByLabel("Day 2 foreman").selectOption(foremanUserId);
+  await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
 
   await expect(dialog).toBeHidden();
-  expect(backend.state.timesheets).toHaveLength(1);
+  expect(backend.state.timesheets).toHaveLength(2);
   expect(backend.state.timesheets[0]?.["status"]).toBe("PRESENT");
   expect(backend.state.timesheets[0]?.["site"]).toBe("North Campus");
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
   expect(backend.state.timesheets[0]?.["foreman_user_id"]).toBe(foremanUserId);
   expect(backend.state.timesheets[0]?.["work_date"]).toMatch(/-\d{2}$/);
+  expect(backend.state.timesheets[0]?.["in_time"]).toBe("08:00");
+  expect(backend.state.timesheets[0]?.["out_time"]).toBe("16:00");
+  expect(backend.state.timesheets[0]?.["break_hours"]).toBe(0);
+  expect(backend.state.timesheets[0]).not.toHaveProperty("total_hours");
+  expect(backend.state.timesheets[0]).not.toHaveProperty("regular_hours");
+  expect(backend.state.timesheets[1]?.["status"]).toBe("ABSENT");
+  expect(backend.state.timesheets[1]?.["in_time"]).toBeNull();
+  expect(backend.state.timesheets[1]?.["out_time"]).toBeNull();
+  expect(backend.state.timesheets[1]?.["break_hours"]).toBe(0);
+  expect(backend.state.timesheets[1]?.["overtime_hours"]).toBe(0);
+  await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+  await dialog.getByLabel("Search employee").fill("Asha");
+  await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+  await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
+  await expect(dialog.getByLabel("Day 2 status")).toHaveValue("ABSENT");
+  await page.screenshot({ path: testInfo.outputPath("saved-attendance.png") });
 });
 
 test("attendance batches can save direct total hours without shift columns", async ({ page }) => {
