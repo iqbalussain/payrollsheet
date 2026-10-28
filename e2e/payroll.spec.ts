@@ -807,6 +807,7 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await dialog.getByRole("button", { name: /Asha Khan/ }).click();
   await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
   await expect(dialog.getByLabel("Day 2 status")).toHaveValue("ABSENT");
+  await dialog.getByRole("checkbox", { name: "In time", exact: true }).check();
   await expect(dialog.getByLabel("Day 1 in time", { exact: true })).toHaveValue("06:00");
   await page.screenshot({ path: testInfo.outputPath("saved-attendance.png") });
 });
@@ -871,7 +872,7 @@ test("attendance batches can save direct total hours without shift columns", asy
   await page.getByLabel("Asha Khan total hours").fill("8.5");
   await page.getByRole("button", { name: "Save Changes" }).first().click();
 
-  expect(backend.state.timesheets).toHaveLength(1);
+  await expect.poll(() => backend.state.timesheets.length).toBe(1);
   expect(backend.state.timesheets[0]?.["status"]).toBe("PRESENT");
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
   expect(backend.state.timesheets[0]?.["foreman_user_id"]).toBe(foremanUserId);
@@ -881,7 +882,7 @@ test("attendance batches can save direct total hours without shift columns", asy
   expect(backend.state.timesheets[0]?.["overtime_hours"]).toBe(0);
 });
 
-test("foreman records attendance from an assigned project card", async ({ page }) => {
+test("foreman records attendance from an assigned project card", async ({ page }, testInfo) => {
   const backend = await mockPayrollBackend(page, "foreman");
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto("/");
@@ -894,6 +895,7 @@ test("foreman records attendance from an assigned project card", async ({ page }
   await page.getByRole("button", { name: /Day 06:00/ }).click();
   await page.getByRole("button", { name: "Apply to selected" }).click();
   await expect(page.getByLabel("Asha Khan clock-in time", { exact: true })).toHaveValue("06:00");
+  await page.screenshot({ path: testInfo.outputPath("six-am-bulk-shift.png") });
   await page.getByLabel("Asha Khan status").selectOption("ABSENT");
   await page.getByRole("button", { name: "Save Changes" }).click();
 
@@ -902,6 +904,25 @@ test("foreman records attendance from an assigned project card", async ({ page }
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
   expect(backend.state.timesheets[0]?.["foreman_user_id"]).toBe(foremanUserId);
   expect(backend.state.timesheets[0]?.["status"]).toBe("ABSENT");
+});
+
+test("monthly attendance preserves a saved 8 AM check-in", async ({ page }) => {
+  const backend = await mockPayrollBackend(page, "admin");
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  backend.state.timesheets.push({ id: randomUUID(), employee_id: 1, work_date: `${month}-01`, site: "North Campus", project_id: northCampusId, foreman: "Samir Foreman", foreman_user_id: foremanUserId, status: "PRESENT", in_time: "08:00:00", out_time: "17:00:00", total_hours: 8, break_hours: 1, overtime_hours: 0, remarks: null, created_at: timestamp });
+  await page.goto("/");
+  await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
+  await openTab(page, "Daily Timesheets", false);
+  await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Search employee").fill("Asha");
+  await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+  await dialog.getByRole("checkbox", { name: "In time", exact: true }).check();
+  await expect(dialog.getByLabel("Day 1 in time", { exact: true })).toHaveValue("08:00");
+  await dialog.getByLabel("Day 2 status").selectOption("PRESENT");
+  await expect(dialog.getByLabel("Day 2 in time", { exact: true })).toHaveValue("06:00");
+  expect(backend.state.timesheets[0]?.["in_time"]).toBe("08:00:00");
 });
 
 test("daily timesheet switches between table and mobile employee cards", async ({ page }) => {
