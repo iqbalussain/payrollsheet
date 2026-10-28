@@ -765,7 +765,7 @@ test("daily timesheet date changes keep the editor open and load the same batch"
   await expect(page.getByLabel("Foreman")).toHaveValue("legacy:Samir");
 });
 
-test("monthly attendance entry saves only days with a selected status", async ({ page }) => {
+test("monthly attendance entry saves only days with a selected status", async ({ page }, testInfo) => {
   const backend = await mockPayrollBackend(page, "admin");
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto("/");
@@ -807,7 +807,7 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await dialog.getByRole("button", { name: /Asha Khan/ }).click();
   await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
   await expect(dialog.getByLabel("Day 2 status")).toHaveValue("ABSENT");
-  await page.screenshot({ path: "/tmp/browser/attendance-save/saved-attendance.png" });
+  await page.screenshot({ path: testInfo.outputPath("saved-attendance.png") });
 });
 
 test("attendance batches can save direct total hours without shift columns", async ({ page }) => {
