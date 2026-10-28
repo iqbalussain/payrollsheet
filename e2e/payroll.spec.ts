@@ -771,7 +771,7 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Daily Timesheets", false);
-  await page.getByRole("button", { name: "Monthly employee entry" }).click();
+  await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Monthly attendance entry")).toBeVisible();
