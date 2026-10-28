@@ -286,31 +286,25 @@ const MonthDayRow = memo(function MonthDayRow({
         </td>
       )}
 
-      {manualMode ? (
-        <td className="px-2 py-1.5">
-          <input
-            type="number"
-            min="0"
-            max="24"
-            step="0.5"
-            value={row.totalHours}
-            disabled={!isWorked}
-            onChange={(event) =>
-              updateDay(day, {
-                totalHours: event.target.value,
-                status: row.status || "PRESENT",
-              })
-            }
-            aria-label={`Day ${day} total hours`}
-            placeholder="8"
-            className={`${input} w-16 px-1.5 py-1 font-bold text-navy text-right disabled:opacity-50`}
-          />
-        </td>
-      ) : (
-        <td className="px-2 py-1.5 text-right font-bold text-navy">
-          {isWorked ? (Number(row.totalHours) || 0).toFixed(1) : "0"}
-        </td>
-      )}
+      <td className="px-2 py-1.5">
+        <input
+          type="number"
+          min="0"
+          max="24"
+          step="0.5"
+          value={row.totalHours}
+          disabled={!isWorked}
+          onChange={(event) =>
+            updateDay(day, {
+              totalHours: event.target.value,
+              status: row.status || "PRESENT",
+            })
+          }
+          aria-label={`Day ${day} total hours`}
+          placeholder="8"
+          className={`${input} w-16 px-1.5 py-1 font-bold text-navy text-right disabled:opacity-50`}
+        />
+      </td>
 
       <td className="px-2 py-1.5">
         <input
@@ -370,6 +364,42 @@ export function MonthlyAttendanceDialog({
   const [bulkOffStatus, setBulkOffStatus] = useState<AttendanceStatus>("WEEKLY_OFF");
 
   const timesheetsQuery = useTimesheetsForMonth(month);
+  const timeMode = Boolean(visibleColumns.inTime && visibleColumns.outTime);
+  const assignmentsQuery = useQuery({
+    queryKey: ["employee_site_assignments", "monthly", singleEmployeeId],
+    enabled: Boolean(singleEmployeeId),
+    queryFn: async () => {
+      const { data, error } = await dbAny
+        .from("employee_site_assignments")
+        .select("site,foreman,project_id,foreman_user_id,effective_from,effective_to")
+        .eq("employee_id", Number(singleEmployeeId));
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        site: string;
+        foreman: string;
+        project_id: string | null;
+        foreman_user_id: string | null;
+        effective_from: string;
+        effective_to: string | null;
+      }>;
+    },
+  });
+  const siteFor = useCallback(
+    (day: number) => {
+      const date = `${month}-${String(day).padStart(2, "0")}`;
+      const match = (assignmentsQuery.data ?? [])
+        .filter((a) => a.effective_from <= date && (!a.effective_to || a.effective_to >= date))
+        .sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+      if (!match) return null;
+      return {
+        site: match.site,
+        projectId: match.project_id ?? "",
+        foreman: match.foreman,
+        foremanUserId: match.foreman_user_id ?? "",
+      };
+    },
+    [assignmentsQuery.data, month],
+  );
   const projectsQuery = useProjects(true);
   const foremenQuery = useQuery({
     queryKey: ["management", "timesheet-foremen"],
@@ -512,6 +542,8 @@ export function MonthlyAttendanceDialog({
         const existing = current[day] ?? emptyDay();
         const next = { ...existing, ...patch };
 
+        const assigned = patch.status && !existing.status ? siteFor(day) : null;
+        if (assigned && !next.site) Object.assign(next, assigned);
         if (patch.status && (!next.site || !next.projectId) && resolvedDefaultProject) {
           next.projectId = resolvedDefaultProject.id;
           next.site = resolvedDefaultProject.name;
@@ -527,6 +559,12 @@ export function MonthlyAttendanceDialog({
           if (inT && outT) {
             next.totalHours = String(Math.max(0, calcDurationHours(inT, outT)).toFixed(1));
           }
+        } else if (patch.totalHours !== undefined && timeMode) {
+          const hrs = Number(patch.totalHours);
+          if (Number.isFinite(hrs) && hrs > 0) {
+            next.inTime ||= "06:00";
+            next.outTime = addHours(next.inTime, hrs);
+          }
         }
 
         if (patch.status && !worked(patch.status)) {
@@ -541,7 +579,7 @@ export function MonthlyAttendanceDialog({
         return { ...current, [day]: next };
       });
     };
-  }, [resolvedDefaultForeman, resolvedDefaultProject]);
+  }, [resolvedDefaultForeman, resolvedDefaultProject, siteFor, timeMode]);
 
   const applyDefaultsToAllDays = () => {
     if (!resolvedDefaultProject && !resolvedDefaultForeman) {
@@ -611,6 +649,8 @@ export function MonthlyAttendanceDialog({
           remarks: "",
         };
       }
+      const assigned = siteFor(day);
+      if (assigned) next[day] = { ...next[day], ...assigned };
     }
     setDays(next);
     notify(
