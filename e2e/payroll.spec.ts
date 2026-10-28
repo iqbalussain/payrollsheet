@@ -792,8 +792,8 @@ test("monthly attendance entry saves only days with a selected status", async ({
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
   expect(backend.state.timesheets[0]?.["foreman_user_id"]).toBe(foremanUserId);
   expect(backend.state.timesheets[0]?.["work_date"]).toMatch(/-\d{2}$/);
-  expect(backend.state.timesheets[0]?.["in_time"]).toBe("08:00");
-  expect(backend.state.timesheets[0]?.["out_time"]).toBe("16:00");
+  expect(backend.state.timesheets[0]?.["in_time"]).toBe("06:00");
+  expect(backend.state.timesheets[0]?.["out_time"]).toBe("14:00");
   expect(backend.state.timesheets[0]?.["break_hours"]).toBe(0);
   expect(backend.state.timesheets[0]).not.toHaveProperty("total_hours");
   expect(backend.state.timesheets[0]).not.toHaveProperty("regular_hours");
@@ -807,6 +807,7 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await dialog.getByRole("button", { name: /Asha Khan/ }).click();
   await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
   await expect(dialog.getByLabel("Day 2 status")).toHaveValue("ABSENT");
+  await expect(dialog.getByLabel("Day 1 in time", { exact: true })).toHaveValue("06:00");
   await page.screenshot({ path: testInfo.outputPath("saved-attendance.png") });
 });
 
@@ -867,7 +868,6 @@ test("attendance batches can save direct total hours without shift columns", asy
   await page.getByRole("checkbox", { name: "In time", exact: true }).uncheck();
   await page.getByRole("checkbox", { name: "Out time", exact: true }).uncheck();
   await page.getByRole("checkbox", { name: "Break", exact: true }).uncheck();
-  await page.getByRole("checkbox", { name: "Overtime", exact: true }).uncheck();
   await page.getByLabel("Asha Khan total hours").fill("8.5");
   await page.getByRole("button", { name: "Save Changes" }).first().click();
 
@@ -875,8 +875,8 @@ test("attendance batches can save direct total hours without shift columns", asy
   expect(backend.state.timesheets[0]?.["status"]).toBe("PRESENT");
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
   expect(backend.state.timesheets[0]?.["foreman_user_id"]).toBe(foremanUserId);
-  expect(backend.state.timesheets[0]?.["in_time"]).toBe("08:00");
-  expect(backend.state.timesheets[0]?.["out_time"]).toBe("16:30");
+  expect(backend.state.timesheets[0]?.["in_time"]).toBe("06:00");
+  expect(backend.state.timesheets[0]?.["out_time"]).toBe("14:30");
   expect(backend.state.timesheets[0]?.["break_hours"]).toBe(0);
   expect(backend.state.timesheets[0]?.["overtime_hours"]).toBe(0);
 });
@@ -889,6 +889,11 @@ test("foreman records attendance from an assigned project card", async ({ page }
   await expect(page.getByText("Your assigned projects")).toBeVisible();
   await page.getByRole("button", { name: /North Campus/ }).click();
   await expect(page.getByLabel("Asha Khan status")).toBeVisible();
+  await expect(page.getByLabel("Asha Khan clock-in time", { exact: true })).toHaveValue("06:00");
+  await expect(page.getByLabel("Bulk in time", { exact: true })).toHaveValue("06:00");
+  await page.getByRole("button", { name: /Day 06:00/ }).click();
+  await page.getByRole("button", { name: "Apply to selected" }).click();
+  await expect(page.getByLabel("Asha Khan clock-in time", { exact: true })).toHaveValue("06:00");
   await page.getByLabel("Asha Khan status").selectOption("ABSENT");
   await page.getByRole("button", { name: "Save Changes" }).click();
 
