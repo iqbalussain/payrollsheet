@@ -59,7 +59,7 @@ const ATTENDANCE_COLUMNS: Array<{ value: AttendanceColumn; label: string }> = [
 ];
 
 const SHIFT_PRESETS = [
-  { start: "08:00", end: "17:00", label: "Day" },
+  { start: "06:00", end: "17:00", label: "Day" },
   { start: "07:00", end: "16:00", label: "Early" },
   { start: "12:00", end: "21:00", label: "Late" },
 ];
@@ -99,7 +99,7 @@ function batchKey(site: string, foreman: string) {
 function defaultAttendance(): AttendanceDraft {
   return {
     status: "PRESENT",
-    inTime: "08:00",
+    inTime: "06:00",
     outTime: "17:00",
     breakHours: "1",
     manualHours: "8",
@@ -430,7 +430,7 @@ export function TimesheetsTab({
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [monthlyAttendanceOpen, setMonthlyAttendanceOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [bulkInTime, setBulkInTime] = useState("08:00");
+  const [bulkInTime, setBulkInTime] = useState("06:00");
   const [bulkOutTime, setBulkOutTime] = useState("17:00");
   const [bulkBreakHours, setBulkBreakHours] = useState("1");
   const [visibleColumns, setVisibleColumns] = useState<Record<AttendanceColumn, boolean>>({
@@ -876,7 +876,7 @@ export function TimesheetsTab({
         next.outTime = "";
         next.breakHours = "0";
       } else if (patch.status && worked(patch.status)) {
-        next.inTime ||= "08:00";
+        next.inTime ||= "06:00";
         next.outTime ||= "17:00";
         next.breakHours ||= "1";
         if (Number(next.manualHours) <= 0 || Number.isNaN(Number(next.manualHours))) {
@@ -1137,8 +1137,8 @@ export function TimesheetsTab({
           const startMinutes = (hours ?? 0) * 60 + (minutes ?? 0) - duration;
           inTime = `${String(Math.floor(startMinutes / 60)).padStart(2, "0")}:${String(startMinutes % 60).padStart(2, "0")}`;
         } else {
-          inTime = "08:00";
-          const endMinutes = 8 * 60 + duration;
+          inTime = "06:00";
+          const endMinutes = 6 * 60 + duration;
           outTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
         }
       }

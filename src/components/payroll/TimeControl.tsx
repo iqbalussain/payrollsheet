@@ -28,7 +28,7 @@ export function TimeControl({ value, onChange, label, disabled = false, compact 
     <div className={`flex items-center ${compact ? "gap-0.5" : "gap-1"}`}>
       <button
         type="button"
-        onClick={() => onChange(shiftTime(value || "08:00", -15))}
+        onClick={() => onChange(shiftTime(value || "06:00", -15))}
         disabled={disabled}
         aria-label={`${label} 15 minutes earlier`}
         title="15 minutes earlier"
@@ -46,7 +46,7 @@ export function TimeControl({ value, onChange, label, disabled = false, compact 
       />
       <button
         type="button"
-        onClick={() => onChange(shiftTime(value || "08:00", 15))}
+        onClick={() => onChange(shiftTime(value || "06:00", 15))}
         disabled={disabled}
         aria-label={`${label} 15 minutes later`}
         title="15 minutes later"

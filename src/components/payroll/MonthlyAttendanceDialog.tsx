@@ -148,7 +148,7 @@ function emptyDay(): DayDraft {
     projectId: "",
     foreman: "",
     foremanUserId: "",
-    inTime: "08:00",
+    inTime: "06:00",
     outTime: "17:00",
     totalHours: "8",
     remarks: "",
@@ -364,7 +364,7 @@ export function MonthlyAttendanceDialog({
 
   const [bulkPattern, setBulkPattern] = useState<"6day" | "5day" | "all">("6day");
   const [bulkDailyHours, setBulkDailyHours] = useState("8");
-  const [bulkInTime, setBulkInTime] = useState("08:00");
+  const [bulkInTime, setBulkInTime] = useState("06:00");
   const [bulkOutTime, setBulkOutTime] = useState("17:00");
   const [bulkWorkingStatus, setBulkWorkingStatus] = useState<AttendanceStatus>("PRESENT");
   const [bulkOffStatus, setBulkOffStatus] = useState<AttendanceStatus>("WEEKLY_OFF");
@@ -534,7 +534,7 @@ export function MonthlyAttendanceDialog({
           next.outTime = "";
           next.totalHours = "0";
         } else if (patch.status && worked(patch.status)) {
-          next.inTime ||= "08:00";
+          next.inTime ||= "06:00";
           next.outTime ||= "17:00";
           next.totalHours ||= "8";
         }
@@ -585,7 +585,7 @@ export function MonthlyAttendanceDialog({
             : weekday !== 5 && weekday !== 6;
 
       if (isWorking) {
-        const endMinutes = 8 * 60 + numHours * 60;
+        const endMinutes = 6 * 60 + numHours * 60;
         const outTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
         next[day] = {
           status: "PRESENT",
@@ -593,7 +593,7 @@ export function MonthlyAttendanceDialog({
           projectId,
           foreman,
           foremanUserId,
-          inTime: "08:00",
+          inTime: "06:00",
           outTime,
           totalHours: String(numHours),
           remarks: "",
@@ -707,8 +707,8 @@ export function MonthlyAttendanceDialog({
             inTime = `${String(Math.floor(startM / 60)).padStart(2, "0")}:${String(Math.floor(startM % 60)).padStart(2, "0")}`;
           }
         } else {
-          inTime = "08:00";
-          const endM = 8 * 60 + durationMinutes;
+          inTime = "06:00";
+          const endM = 6 * 60 + durationMinutes;
           outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
         }
       }
@@ -766,8 +766,8 @@ export function MonthlyAttendanceDialog({
           return;
         }
         totalHours = totalHrs;
-        inTime = "08:00";
-        const endM = 8 * 60 + Math.round(totalHrs * 60);
+        inTime = "06:00";
+        const endM = 6 * 60 + Math.round(totalHrs * 60);
         outTime = `${String(Math.floor(endM / 60)).padStart(2, "0")}:${String(endM % 60).padStart(2, "0")}`;
       } else {
         const [startHour, startMinute = 0] = bulkInTime.split(":").map(Number);
