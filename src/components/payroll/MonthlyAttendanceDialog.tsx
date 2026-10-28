@@ -1,3 +1,4 @@
+import { addHours, assignmentForDate, syncTimesFromHours } from "@/lib/monthly-entry";
 import React, { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -118,11 +119,6 @@ function calcDurationHours(inTime: string, outTime: string) {
   return Math.max(0, (outH * 60 + outM - (inH * 60 + inM)) / 60);
 }
 
-function addHours(inTime: string, hours: number) {
-  const [h = 0, m = 0] = inTime.split(":").map(Number);
-  const total = (Math.round(h * 60 + m + hours * 60) + 24 * 60) % (24 * 60);
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
 
 function dayFromRecord(entry: TimesheetRecord): DayDraft {
   const inTime = entry.in_time?.slice(0, 5) ?? "";
@@ -393,16 +389,7 @@ export function MonthlyAttendanceDialog({
   const siteFor = useCallback(
     (day: number) => {
       const date = `${month}-${String(day).padStart(2, "0")}`;
-      const match = (assignmentsQuery.data ?? [])
-        .filter((a) => a.effective_from <= date && (!a.effective_to || a.effective_to >= date))
-        .sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
-      if (!match) return null;
-      return {
-        site: match.site,
-        projectId: match.project_id ?? "",
-        foreman: match.foreman,
-        foremanUserId: match.foreman_user_id ?? "",
-      };
+      return assignmentForDate(assignmentsQuery.data, date);
     },
     [assignmentsQuery.data, month],
   );
@@ -566,11 +553,8 @@ export function MonthlyAttendanceDialog({
             next.totalHours = String(Math.max(0, calcDurationHours(inT, outT)).toFixed(1));
           }
         } else if (patch.totalHours !== undefined && timeMode) {
-          const hrs = Number(patch.totalHours);
-          if (Number.isFinite(hrs) && hrs > 0) {
-            next.inTime ||= "06:00";
-            next.outTime = addHours(next.inTime, hrs);
-          }
+          const synced = syncTimesFromHours(next.inTime, patch.totalHours);
+          if (synced) Object.assign(next, synced);
         }
 
         if (patch.status && !worked(patch.status)) {
