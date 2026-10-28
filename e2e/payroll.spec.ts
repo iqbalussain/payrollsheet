@@ -780,10 +780,13 @@ test("monthly attendance entry saves only days with a selected status", async ({
   await dialog.getByLabel("Day 1 status").selectOption("PRESENT");
   await dialog.getByLabel("Day 1 site").selectOption(northCampusId);
   await dialog.getByLabel("Day 1 foreman").selectOption(foremanUserId);
+  await dialog.getByLabel("Day 2 status").selectOption("ABSENT");
+  await dialog.getByLabel("Day 2 site").selectOption(northCampusId);
+  await dialog.getByLabel("Day 2 foreman").selectOption(foremanUserId);
   await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
 
   await expect(dialog).toBeHidden();
-  expect(backend.state.timesheets).toHaveLength(1);
+  expect(backend.state.timesheets).toHaveLength(2);
   expect(backend.state.timesheets[0]?.["status"]).toBe("PRESENT");
   expect(backend.state.timesheets[0]?.["site"]).toBe("North Campus");
   expect(backend.state.timesheets[0]?.["project_id"]).toBe(northCampusId);
@@ -794,6 +797,17 @@ test("monthly attendance entry saves only days with a selected status", async ({
   expect(backend.state.timesheets[0]?.["break_hours"]).toBe(0);
   expect(backend.state.timesheets[0]).not.toHaveProperty("total_hours");
   expect(backend.state.timesheets[0]).not.toHaveProperty("regular_hours");
+  expect(backend.state.timesheets[1]?.["status"]).toBe("ABSENT");
+  expect(backend.state.timesheets[1]?.["in_time"]).toBeNull();
+  expect(backend.state.timesheets[1]?.["out_time"]).toBeNull();
+  expect(backend.state.timesheets[1]?.["break_hours"]).toBe(0);
+  expect(backend.state.timesheets[1]?.["overtime_hours"]).toBe(0);
+  await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+  await dialog.getByLabel("Search employee").fill("Asha");
+  await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+  await expect(dialog.getByLabel("Day 1 status")).toHaveValue("PRESENT");
+  await expect(dialog.getByLabel("Day 2 status")).toHaveValue("ABSENT");
+  await page.screenshot({ path: "/tmp/browser/attendance-save/saved-attendance.png" });
 });
 
 test("attendance batches can save direct total hours without shift columns", async ({ page }) => {
