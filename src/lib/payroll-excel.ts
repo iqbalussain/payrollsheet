@@ -187,7 +187,7 @@ export function downloadPayrollImportTemplate() {
     "Hours",
     "Rate",
     "Food Deduction",
-    "Previous Advance",
+    "Adv Deduction",
     "New Advance",
     "Other Deduction",
     "Paid",

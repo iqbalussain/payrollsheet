@@ -281,7 +281,7 @@ function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
     cardWidth,
     [
       { label: "FOOD DEDUCT", value: money(food) },
-      { label: "ADVANCE RECOVERED", value: money(advanceRecovered) },
+      { label: "ADV DEDUCTION", value: money(advanceRecovered) },
       { label: "OTHER DEDUCT", value: money(other) },
     ],
     { label: "TOTAL DEDUCT", value: money(totalDeductions) },

@@ -493,6 +493,74 @@ test("admin can create, submit, and approve a payroll batch", async ({ page }) =
   expect(backend.reads.get("payroll_batches")).toBe(1);
 });
 
+test("admin can preview payroll for one site and manually enter adv deduction", async ({
+  page,
+}) => {
+  const backend = await mockPayrollBackend(page, "admin");
+  const month = new Date().toISOString().slice(0, 7);
+  backend.state.employees.push({
+    id: 2,
+    name: "Bilal Noor",
+    trade: "HELPER",
+    id_number: "E-002",
+    hourly_rate: 4,
+    status: "Active",
+    created_at: timestamp,
+  });
+  backend.state.employee_salary_history.push({
+    id: randomUUID(),
+    employee_id: 2,
+    hourly_rate: 4,
+    effective_on: `${month}-01`,
+    created_at: timestamp,
+  });
+  backend.state.timesheets.push(
+    {
+      id: randomUUID(),
+      employee_id: 1,
+      site: "North Campus",
+      project_id: northCampusId,
+      foreman: "Samir Foreman",
+      foreman_user_id: foremanUserId,
+      work_date: `${month}-01`,
+      status: "PRESENT",
+      regular_hours: 8,
+      overtime_hours: 0,
+    },
+    {
+      id: randomUUID(),
+      employee_id: 2,
+      site: "East Yard",
+      project_id: "00000000-0000-4000-8000-000000000011",
+      foreman: "",
+      foreman_user_id: null,
+      work_date: `${month}-01`,
+      status: "PRESENT",
+      regular_hours: 8,
+      overtime_hours: 0,
+    },
+  );
+
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto("/");
+  await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
+  await openTab(page, "Monthly Payroll", false);
+  await page.getByLabel("Site for payroll generation").selectOption("North Campus");
+  await page.getByRole("button", { name: "Preview Payroll" }).click();
+
+  const preview = page.getByText("Payroll preview").locator("..").locator("..").locator("..");
+  await expect(preview).toContainText("North Campus");
+  await expect(preview).toContainText("Asha Khan");
+  await expect(preview).not.toContainText("Bilal Noor");
+  await preview.getByRole("button", { name: "Generate payroll" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Payroll project")).toHaveValue(northCampusId);
+  const employeeRow = dialog.locator("tbody tr").first();
+  await expect(employeeRow.locator('input[type="number"]').nth(3)).toHaveValue("");
+  await expect(dialog.getByRole("columnheader", { name: "Adv deduction" })).toBeVisible();
+});
+
 test("salary slip selection persists when filtering employees", async ({ page }) => {
   const backend = await mockPayrollBackend(page, "admin");
   const month = new Date().toISOString().slice(0, 7);

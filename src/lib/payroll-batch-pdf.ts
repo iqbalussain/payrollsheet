@@ -21,7 +21,7 @@ export function payrollBatchBlob(batch: PayrollBatch, employees: Employee[]) {
   const columns: Array<[string, number, "left" | "right"]> = [
     ["Emp ID", 22, "left"], ["Employee", 38, "left"], ["Foreman", 30, "left"],
     ["Hours", 18, "right"], ["Rate", 18, "right"], ["Gross", 23, "right"],
-    ["Food", 19, "right"], ["Prev adv.", 22, "right"], ["New adv.", 22, "right"],
+    ["Food", 19, "right"], ["Adv deduction", 22, "right"], ["New adv.", 22, "right"],
     ["Other", 19, "right"], ["Net", 23, "right"], ["Paid", 23, "right"],
   ];
   const drawHeader = (y: number) => {

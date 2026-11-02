@@ -174,7 +174,7 @@ export function EmployeeModal({
                   { label: "Total hours", value: fmt(totals.hours) },
                   { label: "Total gross salary", value: fmt(totals.gross) },
                   { label: "Food deductions", value: fmt(totals.food) },
-                  { label: "Previous advance deductions", value: fmt(totals.prevAdv) },
+                  { label: "Adv deductions", value: fmt(totals.prevAdv) },
                   { label: "New advances", value: fmt(totals.newAdv) },
                   { label: "Other deductions", value: fmt(totals.otherDeduct) },
                   { label: "Total paid", value: fmt(totals.paid) },
@@ -208,7 +208,7 @@ export function EmployeeModal({
                         <th className="px-3 py-2 text-right">Rate</th>
                         <th className="px-3 py-2 text-right">Gross</th>
                         <th className="px-3 py-2 text-right">Food</th>
-                        <th className="px-3 py-2 text-right">Prev adv.</th>
+                        <th className="px-3 py-2 text-right">Adv deduction</th>
                         <th className="px-3 py-2 text-right">New adv.</th>
                         <th className="px-3 py-2 text-right">Outstanding adv.</th>
                         <th className="px-3 py-2 text-right">Other ded.</th>

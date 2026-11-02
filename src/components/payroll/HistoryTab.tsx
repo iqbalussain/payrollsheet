@@ -99,7 +99,7 @@ export function HistoryTab({ employees, batches, advances }: Props) {
               { label: "Total hours", value: fmt(totals.hours) },
               { label: "Total gross", value: fmt(totals.gross) },
               { label: "Food deductions", value: fmt(totals.food) },
-              { label: "Previous advance deductions", value: fmt(totals.prevAdv) },
+              { label: "Adv deductions", value: fmt(totals.prevAdv) },
               { label: "New advances", value: fmt(totals.newAdv) },
               { label: "Other deductions", value: fmt(totals.otherDeduct) },
               { label: "Total paid", value: fmt(totals.paid) },
@@ -135,7 +135,7 @@ export function HistoryTab({ employees, batches, advances }: Props) {
                     <th className="px-3 py-3 text-right">Salary / hr</th>
                     <th className="px-3 py-3 text-right">Gross</th>
                     <th className="px-3 py-3 text-right">Food</th>
-                    <th className="px-3 py-3 text-right">Prev adv.</th>
+                    <th className="px-3 py-3 text-right">Adv deduction</th>
                     <th className="px-3 py-3 text-right">New adv.</th>
                     <th className="px-3 py-3 text-right">Outstanding adv.</th>
                     <th className="px-3 py-3 text-right">Other ded.</th>

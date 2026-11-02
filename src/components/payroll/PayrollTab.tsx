@@ -375,7 +375,7 @@ const numericFields = [
   ["hours", "Hours", true],
   ["rate", "Rate", true],
   ["food_deduction", "Food deduction", false],
-  ["prev_advance", "Previous advance", false],
+  ["prev_advance", "Adv deduction", false],
   ["new_advance", "New advance", false],
   ["other_deduction", "Other deduction", false],
   ["paid", "Paid", false],
@@ -463,7 +463,7 @@ function validateBatch(
     if (employee) {
       const availableAdvance = carryForward(employee.id) + toNum(line.new_advance);
       if (toNum(line.prev_advance) > availableAdvance + 0.001) {
-        errors.push(`Line ${row}: previous advance deduction exceeds the outstanding advance.`);
+        errors.push(`Line ${row}: adv deduction exceeds the outstanding advance.`);
       }
     }
   });
@@ -484,6 +484,7 @@ export function PayrollTab({
   onNewEmployee,
 }: Props) {
   const [month, setMonth] = useState(currentPayrollMonth);
+  const [generationSite, setGenerationSite] = useState("");
   const isMissingPayrollSettingsError = (
     error: { code?: string; message?: string; status?: number } | null,
   ) =>
@@ -577,6 +578,18 @@ export function PayrollTab({
     [timesheets],
   );
   const monthBatches = useMemo(() => batches.filter((b) => b.month === month), [batches, month]);
+  const monthTimesheetSites = useMemo(
+    () =>
+      [
+        ...new Set(
+          timesheets
+            .filter((entry) => entry.work_date.startsWith(`${month}-`))
+            .map((entry) => entry.site.trim())
+            .filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [month, timesheets],
+  );
   const monthSummary = useMemo(
     () =>
       monthBatches.reduce(
@@ -633,7 +646,11 @@ export function PayrollTab({
     setDraft({ id: "", month, site: "", foreman: "", status: "DRAFT", lines: [emptyLine()] });
   };
 
-  const [preview, setPreview] = useState<{ month: string; lines: PayrollLine[] } | null>(null);
+  const [preview, setPreview] = useState<{
+    month: string;
+    site: string;
+    lines: PayrollLine[];
+  } | null>(null);
   const generateFromTimesheets = (previewOnly = false) => {
     if (batchesQuery.error || advanceBalancesQuery.error || salaryHistoryQuery.error) {
       notify(
@@ -657,9 +674,16 @@ export function PayrollTab({
       notify("Timesheet data is still loading. Try again in a moment.", "warn");
       return;
     }
-    const monthlyEntries = timesheets.filter((entry) => entry.work_date.startsWith(`${month}-`));
+    const monthlyEntries = timesheets.filter(
+      (entry) =>
+        entry.work_date.startsWith(`${month}-`) &&
+        (!generationSite || entry.site.trim() === generationSite),
+    );
     if (!monthlyEntries.length) {
-      notify(`No timesheet entries found for ${monthLabel(month)}.`, "warn");
+      notify(
+        `No timesheet entries found for ${monthLabel(month)}${generationSite ? ` at ${generationSite}` : ""}.`,
+        "warn",
+      );
       return;
     }
 
@@ -736,18 +760,6 @@ export function PayrollTab({
       if (total.overtimeHours > 0 && payrollPolicy.overtimeMultiplier === null) {
         return;
       }
-      const outstanding = carryForward(employee.id);
-      const calculation = calculatePayroll({
-        regularHours,
-        overtimeHours,
-        rate: effectiveRate,
-        rateSegments,
-        allowances: 0,
-        deductions: 0,
-        advanceRecovery: 0,
-        policy: payrollPolicy,
-      });
-      const advanceRecovery = Math.min(outstanding, calculation.grossPay);
       const finalCalculation = calculatePayroll({
         regularHours,
         overtimeHours,
@@ -755,7 +767,7 @@ export function PayrollTab({
         rateSegments,
         allowances: 0,
         deductions: 0,
-        advanceRecovery,
+        advanceRecovery: 0,
         policy: payrollPolicy,
       });
       const line: PayrollLine = {
@@ -769,7 +781,7 @@ export function PayrollTab({
         rate: effectiveRate,
         rate_segments: rateSegments,
         food_deduction: 0,
-        prev_advance: advanceRecovery,
+        prev_advance: "",
         new_advance: 0,
         other_deduction: 0,
         net_salary: finalCalculation.netPay,
@@ -808,19 +820,35 @@ export function PayrollTab({
       return;
     }
 
+    const batchSite = generationSite || "Multiple sites";
     if (previewOnly) {
-      setPreview({ month, lines });
+      setPreview({ month, site: generationSite || "All sites", lines });
       return;
     }
     setPreview(null);
     setImportErrors([]);
     setSubmitError("");
+    const employeesWithAttendance = new Set(
+      timesheets
+        .filter((entry) => entry.work_date.startsWith(`${month}-`))
+        .map((entry) => entry.employee_id),
+    );
     const missingAttendance = employees.filter(
-      (employee) => employee.status === "Active" && !totals.has(employee.id),
+      (employee) => employee.status === "Active" && !employeesWithAttendance.has(employee.id),
     ).length;
-    setDraft({ id: "", month, site: "Multiple sites", foreman: "", status: "DRAFT", lines });
+    setDraft({
+      id: "",
+      month,
+      site: batchSite,
+      project_id: generationSite
+        ? (projects.find((project) => project.name === generationSite)?.id ?? null)
+        : null,
+      foreman: "",
+      status: "DRAFT",
+      lines,
+    });
     notify(
-      `${lines.length} employee payroll line(s) generated for review.${skipped ? ` ${skipped} already included or unavailable employee(s) skipped.` : ""}${missingAttendance ? ` ${missingAttendance} active employee(s) had no recorded attendance and were not added.` : ""}${inactive.length ? ` ${inactive.length} inactive or unconfigured employee(s) need review.` : ""}`,
+      `${lines.length} employee payroll line(s) generated${generationSite ? ` for ${generationSite}` : ""} for review.${skipped ? ` ${skipped} already included or unavailable employee(s) skipped.` : ""}${missingAttendance ? ` ${missingAttendance} active employee(s) had no recorded attendance and were not added.` : ""}${inactive.length ? ` ${inactive.length} inactive or unconfigured employee(s) need review.` : ""}`,
       skipped || missingAttendance > 0 || inactive.length > 0 ? "warn" : "ok",
     );
   };
@@ -935,7 +963,9 @@ export function PayrollTab({
         const hours = readNumber("Hours", ["hours"], true);
         const rate = readNumber("Rate", ["rate"]);
         const food = readNumber("Food deduction", ["fooddeduction", "food", "fooddeduct"]);
-        const previousAdvance = readNumber("Previous advance", [
+        const previousAdvance = readNumber("Adv deduction", [
+          "advdeduction",
+          "advancededuction",
           "previousadvance",
           "prevadvance",
           "prevadv",
@@ -954,7 +984,11 @@ export function PayrollTab({
             : (effectiveRateForMonth(employee.id, month, salaryHistory) ?? employee.hourly_rate),
           food_deduction: food,
           prev_advance:
-            values["previousadvance"] || values["prevadvance"] || values["prevadv"]
+            values["advdeduction"] ||
+            values["advancededuction"] ||
+            values["previousadvance"] ||
+            values["prevadvance"] ||
+            values["prevadv"]
               ? previousAdvance
               : carryForward(employee.id),
           new_advance: newAdvance,
@@ -1069,7 +1103,7 @@ export function PayrollTab({
       foreman_user_id: null,
       foreman: "",
       rate: emp ? (effectiveRateForMonth(emp.id, month, salaryHistory) ?? emp.hourly_rate) : "",
-      prev_advance: emp ? carryForward(emp.id) : "",
+      prev_advance: "",
     });
   };
 
@@ -1217,12 +1251,37 @@ export function PayrollTab({
           </label>
           <select
             value={month}
-            onChange={(e) => setMonth(e.target.value)}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setGenerationSite("");
+              setPreview(null);
+            }}
             className={select + " sm:w-64"}
           >
             {monthOptions.map((m) => (
               <option key={m} value={m}>
                 {monthLabel(m)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-48 flex-1">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Payroll site
+          </label>
+          <select
+            value={generationSite}
+            onChange={(event) => {
+              setGenerationSite(event.target.value);
+              setPreview(null);
+            }}
+            className={select}
+            aria-label="Site for payroll generation"
+          >
+            <option value="">All sites</option>
+            {monthTimesheetSites.map((siteName) => (
+              <option key={siteName} value={siteName}>
+                {siteName}
               </option>
             ))}
           </select>
@@ -1247,7 +1306,8 @@ export function PayrollTab({
                 <div>
                   <h3 className="text-lg font-extrabold text-navy">Payroll preview</h3>
                   <p className="text-xs text-muted-foreground">
-                    {monthLabel(preview.month)} · {preview.lines.length} employee(s) · regular rate only
+                    {monthLabel(preview.month)} · {preview.site} · {preview.lines.length} employee(s) ·
+                    regular rate only
                   </p>
                 </div>
                 <button onClick={() => setPreview(null)} className={btnOutline} aria-label="Close preview">
@@ -1511,7 +1571,7 @@ export function PayrollTab({
                       <th className="px-2 py-2 text-right">Rate</th>
                       <th className="px-2 py-2 text-right">Gross</th>
                       <th className="px-2 py-2 text-right">Food</th>
-                      <th className="px-2 py-2 text-right">Prev adv.</th>
+                      <th className="px-2 py-2 text-right">Adv deduction</th>
                       <th className="px-2 py-2 text-right">New adv.</th>
                       <th className="px-2 py-2 text-right">Other ded.</th>
                       <th className="px-2 py-2 text-right">Net</th>
@@ -1538,7 +1598,7 @@ export function PayrollTab({
                                   Outstanding from previous months: {fmt(carry)}
                                 </p>
                                 <p className="text-slate-600">
-                                  Deducting now: {fmt(Math.min(toNum(l.prev_advance), carry))} ·
+                                  Adv deduction now: {fmt(Math.min(toNum(l.prev_advance), carry))} ·
                                   Carries to next month:{" "}
                                   {fmt(
                                     Math.max(
@@ -1734,7 +1794,7 @@ export function PayrollTab({
                           ["hours", "Hours"],
                           ["rate", "Rate"],
                           ["food_deduction", "Food"],
-                          ["prev_advance", "Prev adv."],
+                          ["prev_advance", "Adv deduction"],
                           ["new_advance", "New adv."],
                           ["other_deduction", "Other ded."],
                           ["paid", "Paid"],
@@ -1898,7 +1958,7 @@ export function PayrollTab({
                     <th className="px-3 py-2.5 text-right">Rate</th>
                     <th className="px-3 py-2.5 text-right">Gross</th>
                     <th className="px-3 py-2.5 text-right">Food</th>
-                    <th className="px-3 py-2.5 text-right">Prev. advance</th>
+                    <th className="px-3 py-2.5 text-right">Adv deduction</th>
                     <th className="px-3 py-2.5 text-right">New advance</th>
                     <th className="px-3 py-2.5 text-right">Other deduction</th>
                     <th className="px-3 py-2.5 text-right">Net</th>
