@@ -55,6 +55,7 @@ GRANT EXECUTE ON FUNCTION public.can_read_payroll_user_profile(UUID) TO authenti
 
 DROP POLICY IF EXISTS users_select_self_admin_or_project_foreman ON public.users;
 DROP POLICY IF EXISTS users_select_self_or_admin ON public.users;
+DROP POLICY IF EXISTS users_select_authorized_profiles ON public.users;
 CREATE POLICY users_select_authorized_profiles
   ON public.users FOR SELECT TO authenticated
   USING (public.can_read_payroll_user_profile(user_id));
