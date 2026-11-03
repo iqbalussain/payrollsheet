@@ -506,11 +506,12 @@ export function PayrollTab({
   const timesheetsQuery = useTimesheetsForMonth(month);
   const projectsQuery = useProjects(true);
   const foremenQuery = useActiveForemen();
-  const projects = projectsQuery.data ?? [];
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
   const timesheets = useMemo(() => timesheetsQuery.data ?? [], [timesheetsQuery.data]);
   const timesheetsLoading = timesheetsQuery.isLoading;
   const timesheetsError =
     timesheetsQuery.error instanceof Error ? timesheetsQuery.error.message : "";
+  const projectsError = projectsQuery.error instanceof Error ? projectsQuery.error.message : "";
   const batchesQuery = useBatches(month);
   const batches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data]);
   const payrollSettingsQuery = useQuery({
@@ -594,13 +595,15 @@ export function PayrollTab({
     () =>
       [
         ...new Set(
-          timesheets
-            .filter((entry) => entry.work_date.startsWith(`${month}-`))
-            .map((entry) => entry.site.trim())
-            .filter(Boolean),
+          [
+            ...projects.map((project) => project.name.trim()),
+            ...timesheets
+              .filter((entry) => entry.work_date.startsWith(`${month}-`))
+              .map((entry) => entry.site.trim()),
+          ].filter(Boolean),
         ),
       ].sort((a, b) => a.localeCompare(b)),
-    [month, timesheets],
+    [month, projects, timesheets],
   );
   const monthSummary = useMemo(
     () =>
@@ -1502,7 +1505,19 @@ export function PayrollTab({
           {timesheetsLoading ? "Loading timesheets…" : "Generate Batch from Timesheets"}
         </button>
       </div>
-
+      {(timesheetsError || projectsError) && (
+        <p
+          role="alert"
+          className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
+        >
+          {[
+            timesheetsError && `Could not load attendance for payroll: ${timesheetsError}`,
+            projectsError && `Could not load sites: ${projectsError}`,
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        </p>
+      )}
       <section
         className="mobile-metric-grid grid grid-cols-2 gap-3 sm:grid-cols-4"
         aria-label={`${monthLabel(month)} payroll summary`}

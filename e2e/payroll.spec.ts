@@ -513,6 +513,10 @@ test("admin can generate, submit, and approve a site payroll batch", async ({ pa
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Monthly Payroll", false);
   await expect(page.getByRole("button", { name: "New payroll batch" })).toHaveCount(0);
+  await expect(page.getByLabel("Site for payroll generation")).toHaveValue("");
+  await expect(
+    page.getByLabel("Site for payroll generation").getByRole("option", { name: "East Yard" }),
+  ).toBeAttached();
   await page.getByLabel("Site for payroll generation").selectOption("North Campus");
   await page.getByRole("button", { name: "Generate Batch from Timesheets" }).click();
   const dialog = page.getByRole("dialog");
@@ -629,7 +633,7 @@ test("employee creation rejects duplicate IDs and applies the configured food de
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Employees", false);
-  await page.getByRole("button", { name: "New employee" }).click();
+  await page.getByText("New employee", { exact: true }).click();
 
   const modal = page.locator(".mobile-sheet");
   await modal.getByLabel("Full name").fill("Duplicate Worker");
@@ -896,7 +900,7 @@ test("admin can open a finalized payroll batch for editing", async ({ page }) =>
   await expect(dialog.getByText("Edit payroll batch")).toBeVisible();
   await dialog.getByLabel("Payroll project").selectOption("00000000-0000-4000-8000-000000000011");
   await dialog.getByRole("button", { name: "Save batch" }).click();
-  await expect(page.getByText("East Yard")).toBeVisible();
+  await expect(page.locator(".mobile-batch-card").filter({ hasText: "East Yard" })).toBeVisible();
   expect(backend.state.payroll_batches[0]?.["status"]).toBe("APPROVED");
   expect(backend.state.payroll_batches[0]?.["project_id"]).toBe(
     "00000000-0000-4000-8000-000000000011",
@@ -1268,6 +1272,7 @@ test("attendance report shows daily hours and hover details in the site matrix",
   await openTab(page, "Attendance Report", false);
   await expect(page.getByRole("heading", { name: "Attendance report" })).toBeVisible();
   await page.getByRole("button", { name: "Filter by site" }).click();
+  await expect(page.getByLabel("Site").getByRole("option", { name: "East Yard" })).toBeAttached();
   await page.getByLabel("Site").selectOption({ label: "North Campus" });
 
   await expect(page.getByText("10.5", { exact: true })).toBeVisible();

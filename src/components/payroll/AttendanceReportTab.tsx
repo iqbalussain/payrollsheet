@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { CalendarDays, Clock3, MapPin, Printer, Users } from "lucide-react";
 import type { Employee } from "@/lib/payroll";
 import { useBatches, useTimesheetsForMonth, type TimesheetRecord } from "@/lib/payroll-data";
+import { useProjects } from "@/lib/management-data";
 import { currentPayrollMonth, fmt, monthLabel, payrollMonthOptions, toNum } from "@/lib/payroll";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { btnOutline, card, select } from "./ui";
@@ -275,14 +276,24 @@ export function AttendanceReportTab({ employees }: Props) {
   const [site, setSite] = useState("");
   const timesheetsQuery = useTimesheetsForMonth(month);
   const batchesQuery = useBatches(month);
+  const projectsQuery = useProjects(true);
   const timesheets = useMemo(() => timesheetsQuery.data ?? [], [timesheetsQuery.data]);
-  const loading = timesheetsQuery.isLoading || batchesQuery.isLoading;
-  const queryError = timesheetsQuery.error ?? batchesQuery.error;
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+  const loading = timesheetsQuery.isLoading || batchesQuery.isLoading || projectsQuery.isLoading;
+  const queryError = timesheetsQuery.error ?? batchesQuery.error ?? projectsQuery.error;
   const error = queryError instanceof Error ? queryError.message : "";
 
   const sites = useMemo(
-    () => [...new Set(timesheets.map((entry) => entry.site).filter(Boolean))].sort(),
-    [timesheets],
+    () =>
+      [
+        ...new Set(
+          [
+            ...projects.map((project) => project.name.trim()),
+            ...timesheets.map((entry) => entry.site.trim()),
+          ].filter(Boolean),
+        ),
+      ].sort((a, b) => a.localeCompare(b)),
+    [projects, timesheets],
   );
   const monthOptions = useMemo(
     () =>
@@ -473,7 +484,10 @@ export function AttendanceReportTab({ employees }: Props) {
             Month
             <select
               value={month}
-              onChange={(event) => setMonth(event.target.value)}
+              onChange={(event) => {
+                setMonth(event.target.value);
+                setSite("");
+              }}
               className={select + " mt-1"}
             >
               {monthOptions.map((option) => (
