@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart2,
   CheckCircle2,
@@ -24,6 +24,7 @@ import {
   X,
   UserRound,
   Stethoscope,
+  Trash2,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 
@@ -86,6 +87,11 @@ const ManagementTab = lazy(() =>
     default: module.ManagementTab,
   })),
 );
+const DeleteOnlyTab = lazy(() =>
+  import("@/components/payroll/DeleteOnlyTab").then((module) => ({
+    default: module.DeleteOnlyTab,
+  })),
+);
 import {
   EmployeeModal,
   type EmployeeForm,
@@ -112,14 +118,8 @@ import {
   useSaveTimesheets,
   useUpdateBatchStatus,
 } from "@/lib/payroll-data";
-import type {
-  AdvanceTx,
-  Employee,
-  EmployeeStatus,
-  PayrollBatch,
-  PayrollBatchStatus,
-} from "@/lib/payroll";
-import { db } from "@/integrations/supabase/external-client";
+import type { AdvanceTx, Employee, PayrollBatch, PayrollBatchStatus } from "@/lib/payroll";
+import { db, dbAny } from "@/integrations/supabase/external-client";
 import { clearPayrollCacheUser, initializePayrollCache } from "@/lib/payroll-cache";
 
 const TITLE = "Site Payroll Manager — Wages, Advances & Salary Slips";
@@ -155,6 +155,7 @@ const TABS = [
   { id: "audit", label: "Audit Log", icon: ClipboardList, adminOnly: true },
   { id: "managing", label: "Managing", icon: UserRound, adminOnly: true },
   { id: "diagnostics", label: "Diagnostics", icon: Stethoscope, adminOnly: true },
+  { id: "deletions", label: "Delete records", icon: Trash2, deleteOnly: true },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -164,6 +165,8 @@ const emptyForm: EmployeeForm = {
   trade: "HELPER",
   id_number: "",
   hourly_rate: "",
+  default_food_deduction: "",
+  food_deduction_enabled: false,
   status: "Active",
 };
 
@@ -280,9 +283,13 @@ function Dashboard({
   userId: string;
 }) {
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<TabId>(role === "foreman" ? "timesheets" : "overview");
+  const isDeleteOnly = email.trim().toLowerCase() === "iqbalussain@gmail.com";
+  const [tab, setTab] = useState<TabId>(
+    isDeleteOnly ? "deletions" : role === "foreman" ? "timesheets" : "overview",
+  );
   const [mode, setMode] = useState<ModalMode>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
+  const [duplicateIdError, setDuplicateIdError] = useState("");
   const [toast, setToast] = useState<{ msg: string; tone: "ok" | "warn" } | null>(null);
   const [registeringPasskey, setRegisteringPasskey] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -296,11 +303,44 @@ function Dashboard({
   const cacheReady = cacheState === "ready";
   const employeesQuery = useEmployees(cacheReady);
   const needsPayrollHistory =
-    ["overview", "history", "slips", "advances"].includes(tab) || mode !== null;
+    ["overview", "history", "slips", "advances", "deletions"].includes(tab) || mode !== null;
   const batchesQuery = useBatches(undefined, cacheReady && needsPayrollHistory);
   const saveEmployee = useSaveEmployee();
-  const canDelete = role === "admin";
+  const canDelete = role === "admin" && !isDeleteOnly;
+  const foodSettingsQuery = useQuery({
+    queryKey: ["payroll_settings", "default_food_deduction"],
+    enabled: cacheReady && !isDeleteOnly && ["admin", "hr"].includes(role),
+    queryFn: async () => {
+      const { data, error } = await dbAny
+        .from("payroll_settings")
+        .select("default_food_deduction")
+        .eq("singleton", true)
+        .maybeSingle();
+      if (error) throw error;
+      return Number(
+        (data as { default_food_deduction?: number | null } | null)?.default_food_deduction ?? 0,
+      );
+    },
+  });
+  const saveFoodDefault = useMutation({
+    mutationFn: async (value: number) => {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error("Food deduction default must be zero or greater.");
+      }
+      const { error } = await dbAny
+        .from("payroll_settings")
+        .update({ default_food_deduction: value })
+        .eq("singleton", true);
+      if (error) throw error;
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ["payroll_settings", "default_food_deduction"],
+      }),
+  });
   const availableTabs = TABS.filter((item) => {
+    if (isDeleteOnly) return "deleteOnly" in item && item.deleteOnly;
+    if ("deleteOnly" in item && item.deleteOnly) return false;
     if ("adminOnly" in item && item.adminOnly && !canDelete) return false;
     if (role === "foreman") return item.id === "timesheets" || item.id === "workforce";
     if (role === "manager") {
@@ -331,8 +371,11 @@ function Dashboard({
     let stop: (() => Promise<void>) | undefined;
     setCacheState("loading");
     setCacheError("");
-    void initializePayrollCache(userId, queryClient, (message) =>
-      setToast({ msg: message, tone: "warn" }),
+    void initializePayrollCache(
+      userId,
+      queryClient,
+      (message) => setToast({ msg: message, tone: "warn" }),
+      isDeleteOnly,
     )
       .then((dispose) => {
         stop = dispose;
@@ -353,7 +396,7 @@ function Dashboard({
       active = false;
       if (stop) void stop();
     };
-  }, [cacheAttempt, queryClient, userId]);
+  }, [cacheAttempt, isDeleteOnly, queryClient, userId]);
 
   const employees: Employee[] = employeesQuery.data ?? [];
   const batches: PayrollBatch[] = batchesQuery.data ?? [];
@@ -402,12 +445,15 @@ function Dashboard({
   }, [toast]);
 
   const openFor = (employee: Employee, next: ModalMode) => {
+    setDuplicateIdError("");
     setForm({
       id: employee.id,
       name: employee.name,
       trade: employee.trade,
       id_number: employee.id_number,
       hourly_rate: employee.hourly_rate,
+      default_food_deduction: employee.default_food_deduction,
+      food_deduction_enabled: Number(employee.default_food_deduction) > 0,
       status: employee.status,
     });
     setMode(next);
@@ -418,6 +464,20 @@ function Dashboard({
       notify("Employee name is required.", "warn");
       return;
     }
+    const normalizedId = form.id_number.trim().toLowerCase();
+    const duplicate = normalizedId
+      ? employees.find(
+          (employee) =>
+            employee.id !== form.id && employee.id_number.trim().toLowerCase() === normalizedId,
+        )
+      : undefined;
+    if (duplicate) {
+      setDuplicateIdError(
+        `ID “${form.id_number.trim()}” is already assigned to ${duplicate.name} (employee #${duplicate.id}). Choose a unique ID number.`,
+      );
+      return;
+    }
+    setDuplicateIdError("");
     saveEmployee.mutate(
       {
         ...(form.id ? { id: form.id } : {}),
@@ -425,110 +485,133 @@ function Dashboard({
         trade: form.trade,
         id_number: form.id_number,
         hourly_rate: Number(form.hourly_rate) || 0,
+        default_food_deduction: Number(form.default_food_deduction) || 0,
         status: form.status,
       },
       {
         onSuccess: () => {
           notify(`${form.name.trim()} ${form.id ? "updated" : "added"}.`);
+          setDuplicateIdError("");
           setMode(null);
         },
-        onError: (e) => notify((e as Error).message, "warn"),
+        onError: (error) => {
+          const saveError = error as Error & { code?: string };
+          const message = saveError.message || "Could not save employee.";
+          if (
+            saveError.code === "23505" ||
+            /employees_id_number_normalized_unique_idx/i.test(message)
+          ) {
+            setDuplicateIdError(
+              `ID “${form.id_number.trim()}” is already assigned to another employee. Choose a unique ID number.`,
+            );
+            return;
+          }
+          notify(message, "warn");
+        },
       },
     );
   };
 
-  const error = employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error;
+  const error =
+    employeesQuery.error ?? batchesQuery.error ?? advancesQuery.error ?? foodSettingsQuery.error;
   const commandActions = useMemo(
     () =>
       [
-      {
-        id: "new-employee",
-        label: "New employee",
-        description: "Create a new worker profile",
-        shortcut: "N",
-        action: () => {
-          setForm(emptyForm);
-          setMode("new");
-          navigateToTab("employees");
+        {
+          id: "new-employee",
+          label: "New employee",
+          description: "Create a new worker profile",
+          shortcut: "N",
+          action: () => {
+            setForm(emptyForm);
+            setMode("new");
+            navigateToTab("employees");
+          },
         },
-      },
-      {
-        id: "employees",
-        label: "Open employees",
-        description: "Review the employee master list",
-        shortcut: "E",
-        action: () => navigateToTab("employees"),
-      },
-      {
-        id: "payroll",
-        label: "Open payroll",
-        description: "Manage monthly payroll batches",
-        shortcut: "P",
-        action: () => navigateToTab("payroll"),
-      },
-      {
-        id: "timesheets",
-        label: "Open timesheets",
-        description: "Review daily attendance entries",
-        shortcut: "T",
-        action: () => navigateToTab("timesheets"),
-      },
-      {
-        id: "attendance",
-        label: "Open attendance report",
-        description: "View labor and attendance metrics",
-        shortcut: "A",
-        action: () => navigateToTab("attendance"),
-      },
-      {
-        id: "advances",
-        label: "Open advances",
-        description: "Track outstanding employee advances",
-        shortcut: "V",
-        action: () => navigateToTab("advances"),
-      },
-      {
-        id: "history",
-        label: "Open history",
-        description: "See employee payroll history and balances",
-        shortcut: "H",
-        action: () => navigateToTab("history"),
-      },
-      {
-        id: "slips",
-        label: "Open salary slips",
-        description: "Generate and download payslips",
-        shortcut: "S",
-        action: () => navigateToTab("slips"),
-      },
-      {
-        id: "cost",
-        label: "Open cost allocation",
-        description: "Review labour and site cost reporting",
-        shortcut: "C",
-        action: () => navigateToTab("cost"),
-      },
+        {
+          id: "employees",
+          label: "Open employees",
+          description: "Review the employee master list",
+          shortcut: "E",
+          action: () => navigateToTab("employees"),
+        },
+        {
+          id: "deletions",
+          label: "Delete payroll, sites, and employees",
+          description: "Open the restricted deletion screen",
+          shortcut: "D",
+          action: () => navigateToTab("deletions"),
+        },
+        {
+          id: "payroll",
+          label: "Open payroll",
+          description: "Manage monthly payroll batches",
+          shortcut: "P",
+          action: () => navigateToTab("payroll"),
+        },
+        {
+          id: "timesheets",
+          label: "Open timesheets",
+          description: "Review daily attendance entries",
+          shortcut: "T",
+          action: () => navigateToTab("timesheets"),
+        },
+        {
+          id: "attendance",
+          label: "Open attendance report",
+          description: "View labor and attendance metrics",
+          shortcut: "A",
+          action: () => navigateToTab("attendance"),
+        },
+        {
+          id: "advances",
+          label: "Open advances",
+          description: "Track outstanding employee advances",
+          shortcut: "V",
+          action: () => navigateToTab("advances"),
+        },
+        {
+          id: "history",
+          label: "Open history",
+          description: "See employee payroll history and balances",
+          shortcut: "H",
+          action: () => navigateToTab("history"),
+        },
+        {
+          id: "slips",
+          label: "Open salary slips",
+          description: "Generate and download payslips",
+          shortcut: "S",
+          action: () => navigateToTab("slips"),
+        },
+        {
+          id: "cost",
+          label: "Open cost allocation",
+          description: "Review labour and site cost reporting",
+          shortcut: "C",
+          action: () => navigateToTab("cost"),
+        },
         ...(canDelete
-        ? [
-            {
-              id: "managing",
-              label: "Open user and project management",
-              description: "Manage accounts, roles, and projects",
-              shortcut: "M",
-              action: () => navigateToTab("managing"),
-            },
-          ]
-        : []),
+          ? [
+              {
+                id: "managing",
+                label: "Open user and project management",
+                description: "Manage accounts, roles, and projects",
+                shortcut: "M",
+                action: () => navigateToTab("managing"),
+              },
+            ]
+          : []),
         ...(canDelete
-        ? [
-            {
-              id: "audit",
-              label: "Open audit log",
-              description: "Review payroll changes and transactions",
-              shortcut: "L",
-              action: () => navigateToTab("audit"),
-            },
-          ]
+          ? [
+              {
+                id: "audit",
+                label: "Open audit log",
+                description: "Review payroll changes and transactions",
+                shortcut: "L",
+                action: () => navigateToTab("audit"),
+              },
+            ]
           : []),
       ].filter((action) => availableTabs.some((item) => item.id === action.id)),
     [availableTabs, canDelete, navigateToTab],
@@ -536,7 +619,7 @@ function Dashboard({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      if (!isDeleteOnly && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandOpen(true);
       }
@@ -548,7 +631,7 @@ function Dashboard({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [isDeleteOnly]);
 
   if (cacheState === "loading") {
     return (
@@ -603,62 +686,64 @@ function Dashboard({
           <span>{mobileMenuOpen ? "Close menu" : `Menu · ${activeTab?.label ?? "Navigate"}`}</span>
         </button>
         <div id="application-menu-links" className="floating-menu-links">
-          {availableTabs.map(
-            ({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={(event) => {
-                  navigateToTab(id);
-                  setMobileMenuOpen(false);
-                  if (event.detail > 0) event.currentTarget.blur();
-                }}
-                aria-label={label}
-                aria-current={tab === id ? "page" : undefined}
-                title={label}
-                className={`floating-menu-button ${tab === id ? "is-active" : ""}`}
-              >
-                <Icon size={19} strokeWidth={tab === id ? 2.5 : 2} />
-                <span className="floating-menu-mobile-label">{label}</span>
-                <span className="floating-menu-tooltip">{label}</span>
-              </button>
-            ),
-          )}
+          {availableTabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={(event) => {
+                navigateToTab(id);
+                setMobileMenuOpen(false);
+                if (event.detail > 0) event.currentTarget.blur();
+              }}
+              aria-label={label}
+              aria-current={tab === id ? "page" : undefined}
+              title={label}
+              className={`floating-menu-button ${tab === id ? "is-active" : ""}`}
+            >
+              <Icon size={19} strokeWidth={tab === id ? 2.5 : 2} />
+              <span className="floating-menu-mobile-label">{label}</span>
+              <span className="floating-menu-tooltip">{label}</span>
+            </button>
+          ))}
         </div>
         <div className="floating-menu-tools">
-          <button
-            type="button"
-            onClick={(event) => {
-              setMobileMenuOpen(false);
-              setCommandOpen(true);
-              if (event.detail > 0) event.currentTarget.blur();
-            }}
-            aria-label="Search and commands"
-            title="Search / commands (Ctrl+K)"
-            className="floating-menu-button"
-          >
-            <Search size={18} />
-            <span className="floating-menu-mobile-label">Search / commands</span>
-            <span className="floating-menu-tooltip">Search / commands</span>
-          </button>
-          <button
-            type="button"
-            onClick={(event) => {
-              setMobileMenuOpen(false);
-              if (event.detail > 0) event.currentTarget.blur();
-              void addPasskey();
-            }}
-            disabled={registeringPasskey}
-            aria-label="Add passkey"
-            title={registeringPasskey ? "Adding passkey…" : "Add passkey"}
-            className="floating-menu-button"
-          >
-            <KeyRound size={18} />
-            <span className="floating-menu-mobile-label">Add passkey</span>
-            <span className="floating-menu-tooltip">
-              {registeringPasskey ? "Adding passkey…" : "Add passkey"}
-            </span>
-          </button>
+          {!isDeleteOnly && (
+            <button
+              type="button"
+              onClick={(event) => {
+                setMobileMenuOpen(false);
+                setCommandOpen(true);
+                if (event.detail > 0) event.currentTarget.blur();
+              }}
+              aria-label="Search and commands"
+              title="Search / commands (Ctrl+K)"
+              className="floating-menu-button"
+            >
+              <Search size={18} />
+              <span className="floating-menu-mobile-label">Search / commands</span>
+              <span className="floating-menu-tooltip">Search / commands</span>
+            </button>
+          )}
+          {!isDeleteOnly && (
+            <button
+              type="button"
+              onClick={(event) => {
+                setMobileMenuOpen(false);
+                if (event.detail > 0) event.currentTarget.blur();
+                void addPasskey();
+              }}
+              disabled={registeringPasskey}
+              aria-label="Add passkey"
+              title={registeringPasskey ? "Adding passkey…" : "Add passkey"}
+              className="floating-menu-button"
+            >
+              <KeyRound size={18} />
+              <span className="floating-menu-mobile-label">Add passkey</span>
+              <span className="floating-menu-tooltip">
+                {registeringPasskey ? "Adding passkey…" : "Add passkey"}
+              </span>
+            </button>
+          )}
           <button
             type="button"
             onClick={(event) => {
@@ -745,6 +830,22 @@ function Dashboard({
                 advances={advances}
                 saving={saveBatch.isPending}
                 canDelete={canDelete}
+                defaultFoodDeduction={foodSettingsQuery.data ?? 0}
+                savingFoodDeductionDefault={saveFoodDefault.isPending}
+                canManageFoodDeductionDefault={role === "admin" && !isDeleteOnly}
+                onDefaultFoodDeductionChange={async (value) => {
+                  try {
+                    await saveFoodDefault.mutateAsync(value);
+                    notify("Default food deduction updated.");
+                  } catch (error) {
+                    notify(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not update food deduction default.",
+                      "warn",
+                    );
+                  }
+                }}
                 notify={notify}
                 onNewEmployee={() => {
                   setForm(emptyForm);
@@ -807,6 +908,17 @@ function Dashboard({
             {tab === "audit" && canDelete && <AuditHistoryTab />}
             {tab === "managing" && canDelete && <ManagementTab currentUserId={userId} />}
             {tab === "diagnostics" && canDelete && <DiagnosticsTab />}
+            {tab === "deletions" && isDeleteOnly && (
+              <DeleteOnlyTab
+                employees={employees}
+                batches={batches}
+                onDeleted={(message) => {
+                  void queryClient.invalidateQueries();
+                  notify(message);
+                }}
+                onError={(message) => notify(message, "warn")}
+              />
+            )}
           </main>
         </Suspense>
 
@@ -853,9 +965,13 @@ function Dashboard({
       <EmployeeModal
         mode={mode}
         form={form}
+        saving={saveEmployee.isPending}
+        defaultFoodDeduction={foodSettingsQuery.data ?? 0}
+        duplicateIdError={duplicateIdError}
+        onDismissDuplicateIdError={() => setDuplicateIdError("")}
         batches={batches}
         advances={advances}
-        onChange={(field, value) => setForm((f) => ({ ...f, [field]: value as EmployeeStatus }))}
+        onChange={(field, value) => setForm((current) => ({ ...current, [field]: value }))}
         onClose={() => setMode(null)}
         onSubmit={submitEmployee}
         onSwitchToEdit={() => setMode("edit")}

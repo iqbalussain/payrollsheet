@@ -1,4 +1,4 @@
-import { X, Save, Pencil } from "lucide-react";
+import { X, Save, Pencil, LoaderCircle } from "lucide-react";
 import {
   STATUSES,
   TRADES,
@@ -28,6 +28,8 @@ export interface EmployeeForm {
   trade: string;
   id_number: string;
   hourly_rate: string | number;
+  default_food_deduction: string | number;
+  food_deduction_enabled: boolean;
   status: EmployeeStatus;
 }
 
@@ -36,10 +38,14 @@ interface Props {
   form: EmployeeForm;
   batches: PayrollBatch[];
   advances: AdvanceTx[];
-  onChange: (field: keyof EmployeeForm, value: string) => void;
+  onChange: (field: keyof EmployeeForm, value: string | boolean) => void;
   onClose: () => void;
   onSubmit: () => void;
   onSwitchToEdit: () => void;
+  saving?: boolean;
+  defaultFoodDeduction?: number;
+  duplicateIdError?: string;
+  onDismissDuplicateIdError?: () => void;
 }
 
 export function EmployeeModal({
@@ -51,6 +57,10 @@ export function EmployeeModal({
   onClose,
   onSubmit,
   onSwitchToEdit,
+  saving = false,
+  defaultFoodDeduction = 0,
+  duplicateIdError = "",
+  onDismissDuplicateIdError,
 }: Props) {
   if (!mode) return null;
   const readOnly = mode === "view";
@@ -92,10 +102,14 @@ export function EmployeeModal({
         >
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label
+                htmlFor="employee-full-name"
+                className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >
                 Full name <span className="text-danger">*</span>
               </label>
               <input
+                id="employee-full-name"
                 value={form.name}
                 readOnly={readOnly}
                 onChange={(e) => onChange("name", e.target.value)}
@@ -122,16 +136,54 @@ export function EmployeeModal({
               )}
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label
+                htmlFor="employee-id-number"
+                className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >
                 ID number
               </label>
               <input
+                id="employee-id-number"
                 value={form.id_number}
                 readOnly={readOnly}
                 onChange={(e) => onChange("id_number", e.target.value)}
                 className={input + ro}
                 placeholder="Passport / ID"
               />
+            </div>
+            <div className="sm:col-span-2 rounded-lg border border-border p-3">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.food_deduction_enabled}
+                  disabled={readOnly}
+                  onChange={(event) => {
+                    onChange("food_deduction_enabled", event.target.checked);
+                    onChange(
+                      "default_food_deduction",
+                      event.target.checked ? String(defaultFoodDeduction) : "0",
+                    );
+                  }}
+                  className="h-4 w-4 rounded accent-navy"
+                />
+                Food deduction
+              </label>
+              <label className="mt-2 block text-xs font-semibold text-slate-600">
+                Food deduction amount (OMR)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  value={form.default_food_deduction}
+                  readOnly={readOnly}
+                  disabled={readOnly || !form.food_deduction_enabled}
+                  onChange={(event) => onChange("default_food_deduction", event.target.value)}
+                  className={`${input} mt-1`}
+                />
+                <span className="mt-1 block font-normal text-muted-foreground">
+                  New employees use the configured default of {fmt(defaultFoodDeduction)} OMR.
+                </span>
+              </label>
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -293,14 +345,45 @@ export function EmployeeModal({
                 <button type="button" onClick={onClose} className={btnOutline}>
                   Cancel
                 </button>
-                <button type="submit" className={btnGold}>
-                  <Save size={14} /> {mode === "new" ? "Create" : "Update"}
+                <button type="submit" disabled={saving} className={btnGold}>
+                  {saving ? (
+                    <LoaderCircle size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {saving ? "Saving…" : mode === "new" ? "Create" : "Update"}
                 </button>
               </>
             )}
           </div>
         </form>
       </div>
+      {duplicateIdError && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="duplicate-employee-id-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-danger/30 bg-card p-5 shadow-xl">
+            <h3
+              id="duplicate-employee-id-title"
+              className="font-display text-lg font-bold text-danger"
+            >
+              Employee ID already exists
+            </h3>
+            <p className="mt-2 text-sm text-slate-700">{duplicateIdError}</p>
+            <button
+              type="button"
+              onClick={onDismissDuplicateIdError}
+              className={`${btnGold} mt-4`}
+              autoFocus
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

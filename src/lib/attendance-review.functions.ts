@@ -51,6 +51,15 @@ function minutes(value: string) {
   return hour! * 60 + minute!;
 }
 
+function rejectDeleteOnlyAccount(claims: Record<string, unknown>) {
+  if (
+    typeof claims["email"] === "string" &&
+    claims["email"].trim().toLowerCase() === "iqbalussain@gmail.com"
+  ) {
+    throw new Error("This account is restricted to deleting employees, sites, and payroll.");
+  }
+}
+
 export const reviewProjectAttendance = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: unknown) =>
@@ -63,6 +72,7 @@ export const reviewProjectAttendance = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data, context }) => {
+    rejectDeleteOnlyAccount(context.claims);
     const supabase = context.supabase as unknown as SupabaseClient<ExternalDatabase>;
     const { data: profile, error: profileError } = await supabase
       .from("users")
@@ -278,6 +288,7 @@ export const reviewDailyAttendance = createServerFn({ method: "POST" })
     z.object({ workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).parse(data),
   )
   .handler(async ({ data, context }) => {
+    rejectDeleteOnlyAccount(context.claims);
     const { data: profile, error: profileError } = await dbAny
       .from("users")
       .select("role,is_active")

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Banknote, Eye, Plus, Save, Trash2, X, Search } from "lucide-react";
+import { Banknote, Eye, LoaderCircle, Plus, Save, Trash2, X, Search } from "lucide-react";
 import {
   ADVANCE_REASONS,
   PAYMENT_METHODS,
@@ -350,7 +350,8 @@ export function AdvancesTab({
           </div>
           <div className="mt-3 flex gap-2">
             <button onClick={submit} disabled={saving} className={btnGold}>
-              <Save size={15} /> {saving ? "Saving…" : "Save advance"}
+              {saving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}
+              {saving ? "Saving…" : "Save advance"}
             </button>
             <button
               onClick={() => {

@@ -900,6 +900,59 @@
     margin: 10mm;
   }
 
+  body:has(.daily-attendance-report) * {
+    visibility: hidden !important;
+  }
+
+  .daily-attendance-report,
+  .daily-attendance-report * {
+    visibility: visible !important;
+  }
+
+  .daily-attendance-report {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    color: var(--foreground) !important;
+    background: var(--background) !important;
+    font-size: 8pt !important;
+  }
+
+  .daily-attendance-report table {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+  }
+
+  .daily-attendance-report thead {
+    display: table-header-group !important;
+  }
+
+  .daily-attendance-report tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .daily-attendance-report th:last-child,
+  .daily-attendance-report td:last-child {
+    display: none !important;
+  }
+
+  .daily-attendance-report th,
+  .daily-attendance-report td {
+    padding: 3px 4px !important;
+    border: 0.15mm solid var(--muted-foreground) !important;
+    color: var(--foreground) !important;
+    background: var(--background) !important;
+    overflow-wrap: anywhere !important;
+  }
+
   html,
   body {
     width: auto;
@@ -1025,6 +1078,24 @@
     width: 12mm !important;
     max-width: 12mm !important;
     text-align: left !important;
+  }
+
+  .attendance-report-print th:nth-last-child(5),
+  .attendance-report-print td:nth-last-child(5) {
+    width: 16mm !important;
+    max-width: 16mm !important;
+    text-align: right !important;
+  }
+
+  .attendance-report-print th:nth-last-child(4),
+  .attendance-report-print td:nth-last-child(4),
+  .attendance-report-print th:nth-last-child(3),
+  .attendance-report-print td:nth-last-child(3),
+  .attendance-report-print th:nth-last-child(2),
+  .attendance-report-print td:nth-last-child(2) {
+    width: 12mm !important;
+    max-width: 12mm !important;
+    text-align: right !important;
   }
 
   .attendance-report-print th:last-child,

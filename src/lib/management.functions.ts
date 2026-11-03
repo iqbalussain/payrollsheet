@@ -35,7 +35,18 @@ const saveProjectInput = z.object({
   foremanUserId: z.string().uuid().nullable(),
 });
 
-async function assertAdmin(context: { userId: string; supabase: SupabaseClient<any> }) {
+async function assertAdmin(context: {
+  userId: string;
+  supabase: SupabaseClient<any>;
+  claims: Record<string, unknown>;
+}) {
+  const email =
+    typeof context.claims?.["email"] === "string"
+      ? context.claims["email"].trim().toLowerCase()
+      : "";
+  if (email === "iqbalussain@gmail.com") {
+    throw new Error("This account is restricted to deleting employees, sites, and payroll.");
+  }
   const { data, error } = await context.supabase
     .from("users")
     .select("role,is_active")
@@ -73,7 +84,8 @@ export const saveManagedUser = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => saveUserInput.parse(data))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const supabaseAdmin = (await import("@/integrations/supabase/client.server")).supabaseAdmin as unknown as SupabaseClient<any>;
+    const supabaseAdmin = (await import("@/integrations/supabase/client.server"))
+      .supabaseAdmin as unknown as SupabaseClient<any>;
     const input = data;
 
     if (input.role !== "manager" && input.projectIds.length > 0) {
@@ -270,7 +282,8 @@ export const saveManagedProject = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => saveProjectInput.parse(data))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    const supabaseAdmin = (await import("@/integrations/supabase/client.server")).supabaseAdmin as unknown as SupabaseClient<any>;
+    const supabaseAdmin = (await import("@/integrations/supabase/client.server"))
+      .supabaseAdmin as unknown as SupabaseClient<any>;
     if (data.foremanUserId) {
       const { data: foreman, error } = await supabaseAdmin
         .from("users")

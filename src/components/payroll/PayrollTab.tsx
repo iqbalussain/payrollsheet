@@ -9,6 +9,7 @@ import {
   Eye,
   FileSpreadsheet,
   HardHat,
+  LoaderCircle,
   Pencil,
   Plus,
   Save,
@@ -77,6 +78,10 @@ interface Props {
   saving: boolean;
   notify: (msg: string, tone?: "ok" | "warn") => void;
   onNewEmployee?: () => void;
+  defaultFoodDeduction: number;
+  savingFoodDeductionDefault: boolean;
+  onDefaultFoodDeductionChange: (value: number) => Promise<void>;
+  canManageFoodDeductionDefault: boolean;
 }
 
 interface EmployeeSearchProps {
@@ -482,6 +487,10 @@ export function PayrollTab({
   saving,
   notify,
   onNewEmployee,
+  defaultFoodDeduction,
+  savingFoodDeductionDefault,
+  onDefaultFoodDeductionChange,
+  canManageFoodDeductionDefault,
 }: Props) {
   const [month, setMonth] = useState(currentPayrollMonth);
   const [generationSite, setGenerationSite] = useState("");
@@ -529,9 +538,7 @@ export function PayrollTab({
   );
   const salaryHistoryQuery = useQuery({
     queryKey: ["employee_salary_history"],
-    queryFn: async (): Promise<
-      SalaryHistoryRecord[]
-    > => {
+    queryFn: async (): Promise<SalaryHistoryRecord[]> => {
       const { data, error } = await dbAny.from("employee_salary_history").select("*");
       if (error) {
         // Never block payroll on salary history; fall back to current hourly rates.
@@ -565,7 +572,12 @@ export function PayrollTab({
   const [isImporting, setIsImporting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [foodDeductionDefaultDraft, setFoodDeductionDefaultDraft] = useState(defaultFoodDeduction);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    setFoodDeductionDefaultDraft(defaultFoodDeduction);
+  }, [defaultFoodDeduction]);
 
   const monthOptions = useMemo(
     () =>
@@ -610,6 +622,20 @@ export function PayrollTab({
     () => lockedEmployeeIds(batches, month, draft?.id ?? null),
     [batches, month, draft?.id],
   );
+
+  const foodDeductionForEmployee = (employeeId: number) => {
+    const employee = employees.find((item) => item.id === employeeId);
+    const priorLines = batches
+      .filter((batch) => batch.month < month)
+      .flatMap((batch) =>
+        batch.lines
+          .filter((line) => Number(line.employee_id) === employeeId)
+          .map((line) => ({ month: batch.month, line })),
+      )
+      .sort((a, b) => b.month.localeCompare(a.month));
+    if (priorLines.length) return toNum(priorLines[0]!.line.food_deduction);
+    return toNum(employee?.default_food_deduction ?? defaultFoodDeduction);
+  };
 
   const foremen = useMemo(() => {
     return [...(foremenQuery.data ?? [])].sort((a, b) =>
@@ -760,13 +786,14 @@ export function PayrollTab({
       if (total.overtimeHours > 0 && payrollPolicy.overtimeMultiplier === null) {
         return;
       }
+      const foodDeduction = foodDeductionForEmployee(employeeId);
       const finalCalculation = calculatePayroll({
         regularHours,
         overtimeHours,
         rate: effectiveRate,
         rateSegments,
         allowances: 0,
-        deductions: 0,
+        deductions: foodDeduction,
         advanceRecovery: 0,
         policy: payrollPolicy,
       });
@@ -780,7 +807,7 @@ export function PayrollTab({
         hours: Number((total.regularHours + total.overtimeHours).toFixed(3)),
         rate: effectiveRate,
         rate_segments: rateSegments,
-        food_deduction: 0,
+        food_deduction: foodDeduction,
         prev_advance: "",
         new_advance: 0,
         other_deduction: 0,
@@ -797,6 +824,30 @@ export function PayrollTab({
         deductions: finalCalculation.deductions,
         advance_recovery: finalCalculation.advanceRecovery,
         net_pay: finalCalculation.netPay,
+        days_worked: new Set(
+          monthlyEntries
+            .filter(
+              (entry) =>
+                entry.employee_id === employeeId &&
+                (entry.status === "PRESENT" || entry.status === "HALF_DAY"),
+            )
+            .map((entry) => entry.work_date),
+        ).size,
+        site: (() => {
+          const sites = [
+            ...new Set(
+              monthlyEntries
+                .filter((entry) => entry.employee_id === employeeId)
+                .map((entry) => entry.site.trim())
+                .filter(Boolean),
+            ),
+          ];
+          return sites.length === 1
+            ? sites[0]!
+            : sites.length
+              ? "Multiple sites"
+              : generationSite || "Multiple sites";
+        })(),
       };
       lines.push(line);
     });
@@ -990,7 +1041,7 @@ export function PayrollTab({
             values["prevadvance"] ||
             values["prevadv"]
               ? previousAdvance
-              : carryForward(employee.id),
+              : 0,
           new_advance: newAdvance,
           other_deduction: otherDeduction,
           net_salary: 0,
@@ -1286,6 +1337,36 @@ export function PayrollTab({
             ))}
           </select>
         </div>
+        {canManageFoodDeductionDefault && (
+          <label className="min-w-40 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Default food deduction
+            <input
+              aria-label="Default food deduction"
+              type="number"
+              min="0"
+              step="0.001"
+              value={foodDeductionDefaultDraft}
+              disabled={savingFoodDeductionDefault}
+              onChange={(event) => setFoodDeductionDefaultDraft(Number(event.target.value) || 0)}
+              className={`${input} mt-1`}
+            />
+            <button
+              type="button"
+              disabled={
+                savingFoodDeductionDefault || foodDeductionDefaultDraft === defaultFoodDeduction
+              }
+              onClick={() => void onDefaultFoodDeductionChange(foodDeductionDefaultDraft)}
+              className={`${btnOutline} mt-2 w-full`}
+            >
+              {savingFoodDeductionDefault ? (
+                <LoaderCircle size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
+              {savingFoodDeductionDefault ? "Saving…" : "Save default"}
+            </button>
+          </label>
+        )}
         <button
           onClick={() => generateFromTimesheets(true)}
           disabled={timesheetsLoading || Boolean(timesheetsError)}
@@ -1306,22 +1387,32 @@ export function PayrollTab({
                 <div>
                   <h3 className="text-lg font-extrabold text-navy">Payroll preview</h3>
                   <p className="text-xs text-muted-foreground">
-                    {monthLabel(preview.month)} · {preview.site} · {preview.lines.length} employee(s) ·
-                    regular rate only
+                    {monthLabel(preview.month)} · {preview.site} · {preview.lines.length}{" "}
+                    employee(s) · regular rate only
                   </p>
                 </div>
-                <button onClick={() => setPreview(null)} className={btnOutline} aria-label="Close preview">
+                <button
+                  onClick={() => setPreview(null)}
+                  className={btnOutline}
+                  aria-label="Close preview"
+                >
                   <X size={15} />
                 </button>
               </div>
               <div className="min-h-0 flex-1 overflow-auto">
-                <table className="w-full text-xs">
+                <table className="w-full min-w-[860px] text-xs">
                   <thead className="sticky top-0 bg-navy-soft">
                     <tr className="text-left text-[10px] font-bold uppercase text-muted-foreground">
                       <th className="px-2 py-2">Employee</th>
                       <th className="px-2 py-2 text-right">Hours</th>
                       <th className="px-2 py-2 text-right">Rate</th>
-                      <th className="px-2 py-2 text-right">Salary (OMR)</th>
+                      <th className="px-2 py-2 text-right">Base</th>
+                      <th className="px-2 py-2 text-right">OT</th>
+                      <th className="px-2 py-2 text-right">Food deduction</th>
+                      <th className="px-2 py-2 text-right">Allowances</th>
+                      <th className="px-2 py-2 text-right">Net pay</th>
+                      <th className="px-2 py-2 text-right">Days worked</th>
+                      <th className="px-2 py-2 text-left">Site</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1337,9 +1428,15 @@ export function PayrollTab({
                           </td>
                           <td className="px-2 py-1.5 text-right">{fmt(toNum(l.hours))}</td>
                           <td className="px-2 py-1.5 text-right">{fmt(toNum(l.rate))}</td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.regular_pay))}</td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.overtime_pay))}</td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.food_deduction))}</td>
+                          <td className="px-2 py-1.5 text-right">{fmt(toNum(l.allowances))}</td>
                           <td className="px-2 py-1.5 text-right font-bold text-navy">
-                            {fmt(toNum(l.gross_pay ?? l.regular_pay ?? 0))}
+                            {fmt(toNum(l.net_pay ?? l.net_salary))}
                           </td>
+                          <td className="px-2 py-1.5 text-right">{l.days_worked ?? 0}</td>
+                          <td className="px-2 py-1.5">{l.site ?? preview.site}</td>
                         </tr>
                       );
                     })}
@@ -1352,16 +1449,45 @@ export function PayrollTab({
                       </td>
                       <td />
                       <td className="px-2 py-2 text-right">
-                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.gross_pay ?? l.regular_pay ?? 0), 0))}
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.regular_pay), 0))}
                       </td>
+                      <td className="px-2 py-2 text-right">
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.overtime_pay), 0))}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.food_deduction), 0))}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {fmt(preview.lines.reduce((t, l) => t + toNum(l.allowances), 0))}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {fmt(
+                          preview.lines.reduce((t, l) => t + toNum(l.net_pay ?? l.net_salary), 0),
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {preview.lines.reduce((t, l) => t + (l.days_worked ?? 0), 0)}
+                      </td>
+                      <td />
                     </tr>
                   </tfoot>
                 </table>
               </div>
               <div className="mt-3 flex justify-end gap-2">
-                <button onClick={() => setPreview(null)} className={btnOutline}>Cancel</button>
-                <button onClick={() => generateFromTimesheets(false)} className={btnGold}>
-                  Generate payroll
+                <button onClick={() => setPreview(null)} className={btnOutline}>
+                  Cancel
+                </button>
+                <button
+                  onClick={() => generateFromTimesheets(false)}
+                  disabled={saving}
+                  className={btnGold}
+                >
+                  {saving ? (
+                    <LoaderCircle size={15} className="animate-spin" />
+                  ) : (
+                    <Clock3 size={15} />
+                  )}
+                  {saving ? "Generating…" : "Generate payroll"}
                 </button>
               </div>
             </div>
@@ -1374,9 +1500,6 @@ export function PayrollTab({
         >
           <Clock3 size={15} />{" "}
           {timesheetsLoading ? "Loading timesheets…" : "Generate Batch from Timesheets"}
-        </button>
-        <button onClick={startNew} className={btnGold}>
-          <Plus size={16} /> New payroll batch
         </button>
       </div>
 
@@ -1872,7 +1995,8 @@ export function PayrollTab({
                 }
                 className={btnGold}
               >
-                <Save size={15} /> {saving ? "Saving…" : "Save batch"}
+                {saving ? <LoaderCircle size={15} className="animate-spin" /> : <Save size={15} />}
+                {saving ? "Saving…" : "Save batch"}
               </button>
             </div>
           </DialogContent>

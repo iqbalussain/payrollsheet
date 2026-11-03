@@ -177,9 +177,7 @@ async function deriveFallbackAllocations(month: string): Promise<PayrollSiteAllo
     }
   }
 
-  return result.sort(
-    (a, b) => a.site.localeCompare(b.site) || a.foreman.localeCompare(b.foreman),
-  );
+  return result.sort((a, b) => a.site.localeCompare(b.site) || a.foreman.localeCompare(b.foreman));
 }
 
 export function usePayrollSiteAllocations(month: string, enabled = true) {
@@ -295,7 +293,8 @@ export function useBatches(month?: string, enabled = true) {
           deductions: l.deductions,
           advance_recovery: l.advance_recovery,
           net_pay: l.net_pay,
-          rate_segments: ((l as { rate_segments?: unknown }).rate_segments ?? null) as PayrollLine["rate_segments"],
+          rate_segments: ((l as { rate_segments?: unknown }).rate_segments ??
+            null) as PayrollLine["rate_segments"],
         };
         (byBatch[l.batch_id] ??= []).push(line);
       });
@@ -355,6 +354,7 @@ export function useSaveEmployee() {
         trade: emp.trade ?? "HELPER",
         id_number: emp.id_number ?? "",
         hourly_rate: toNum(emp.hourly_rate),
+        default_food_deduction: toNum(emp.default_food_deduction),
         status: emp.status ?? "Active",
       };
       if (emp.id) {

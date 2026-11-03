@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CalendarDays, Clock3, MapPin, Printer, Users } from "lucide-react";
 import type { Employee } from "@/lib/payroll";
-import { useTimesheetsForMonth, type TimesheetRecord } from "@/lib/payroll-data";
-import { currentPayrollMonth, fmt, monthLabel, payrollMonthOptions } from "@/lib/payroll";
+import { useBatches, useTimesheetsForMonth, type TimesheetRecord } from "@/lib/payroll-data";
+import { currentPayrollMonth, fmt, monthLabel, payrollMonthOptions, toNum } from "@/lib/payroll";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { btnOutline, card, select } from "./ui";
 
@@ -15,6 +15,10 @@ interface AttendanceMatrixRow {
   name: string;
   trade: string;
   hours: number;
+  present: number;
+  absent: number;
+  overtime: number;
+  deductions: number;
 }
 
 function AttendanceMatrix({
@@ -23,6 +27,7 @@ function AttendanceMatrix({
   days,
   rows,
   entryByEmployeeDay,
+  columnEntries,
   site,
 }: {
   title: string;
@@ -30,8 +35,27 @@ function AttendanceMatrix({
   days: string[];
   rows: AttendanceMatrixRow[];
   entryByEmployeeDay: Map<string, TimesheetRecord>;
+  columnEntries: TimesheetRecord[];
   site?: string | undefined;
 }) {
+  const columnTotals = days.map((date) => {
+    const entries = columnEntries.filter((entry) => entry.work_date === date);
+    return {
+      present: entries.filter(isWorked).length,
+      absent: entries.filter((entry) => entry.status === "ABSENT").length,
+      overtime: entries.reduce((sum, entry) => sum + toNum(entry.overtime_hours), 0),
+    };
+  });
+  const totals = rows.reduce(
+    (result, row) => ({
+      hours: result.hours + row.hours,
+      present: result.present + row.present,
+      absent: result.absent + row.absent,
+      overtime: result.overtime + row.overtime,
+      deductions: result.deductions + row.deductions,
+    }),
+    { hours: 0, present: 0, absent: 0, overtime: 0, deductions: 0 },
+  );
   return (
     <div className={card + " attendance-report-matrix overflow-hidden"}>
       <div className="border-b border-border px-4 py-3">
@@ -65,6 +89,12 @@ function AttendanceMatrix({
                   <th className="sticky right-0 z-30 min-w-20 border-b border-l border-border bg-navy-soft px-2 py-2 text-right">
                     Total hrs
                   </th>
+                  <th className="min-w-16 border-b border-border px-2 py-2 text-right">Present</th>
+                  <th className="min-w-16 border-b border-border px-2 py-2 text-right">Absent</th>
+                  <th className="min-w-16 border-b border-border px-2 py-2 text-right">OT hrs</th>
+                  <th className="min-w-20 border-b border-border px-2 py-2 text-right">
+                    Deductions
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -91,9 +121,45 @@ function AttendanceMatrix({
                     <td className="sticky right-0 z-10 border-b border-l border-border bg-background px-2 py-1.5 text-right font-bold text-navy">
                       {fmt(row.hours)}
                     </td>
+                    <td className="border-b border-border px-2 py-1.5 text-right">{row.present}</td>
+                    <td className="border-b border-border px-2 py-1.5 text-right">{row.absent}</td>
+                    <td className="border-b border-border px-2 py-1.5 text-right">
+                      {fmt(row.overtime)}
+                    </td>
+                    <td className="border-b border-border px-2 py-1.5 text-right">
+                      {fmt(row.deductions)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-navy-soft/70 font-bold text-navy">
+                  <th className="sticky left-0 z-10 border-r border-border px-3 py-2 text-left">
+                    Total
+                  </th>
+                  <td className="sticky left-52 z-10 border-r border-border px-2 py-2 text-left">
+                    —
+                  </td>
+                  {columnTotals.map((total, index) => (
+                    <td
+                      key={days[index]}
+                      className="border-r border-border px-0.5 py-1 text-center text-[9px]"
+                    >
+                      <span className="block">
+                        {total.present}P · {total.absent}A
+                      </span>
+                      <span className="block">OT {fmt(total.overtime)}</span>
+                    </td>
+                  ))}
+                  <td className="border-l border-border px-2 py-2 text-right">
+                    {fmt(totals.hours)}
+                  </td>
+                  <td className="px-2 py-2 text-right">{totals.present}</td>
+                  <td className="px-2 py-2 text-right">{totals.absent}</td>
+                  <td className="px-2 py-2 text-right">{fmt(totals.overtime)}</td>
+                  <td className="px-2 py-2 text-right">{fmt(totals.deductions)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </TooltipProvider>
@@ -208,9 +274,11 @@ export function AttendanceReportTab({ employees }: Props) {
   const [employeeId, setEmployeeId] = useState("");
   const [site, setSite] = useState("");
   const timesheetsQuery = useTimesheetsForMonth(month);
+  const batchesQuery = useBatches(month);
   const timesheets = useMemo(() => timesheetsQuery.data ?? [], [timesheetsQuery.data]);
-  const loading = timesheetsQuery.isLoading;
-  const error = timesheetsQuery.error instanceof Error ? timesheetsQuery.error.message : "";
+  const loading = timesheetsQuery.isLoading || batchesQuery.isLoading;
+  const queryError = timesheetsQuery.error ?? batchesQuery.error;
+  const error = queryError instanceof Error ? queryError.message : "";
 
   const sites = useMemo(
     () => [...new Set(timesheets.map((entry) => entry.site).filter(Boolean))].sort(),
@@ -234,6 +302,22 @@ export function AttendanceReportTab({ employees }: Props) {
   const employeeRows = reportRows
     .filter((entry) => String(entry.employee_id) === employeeId)
     .sort((a, b) => a.work_date.localeCompare(b.work_date));
+  const payrollBatches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data]);
+  const employeeDeductions = useCallback(
+    (id: number) =>
+      payrollBatches
+        .flatMap((batch) => batch.lines)
+        .filter((line) => Number(line.employee_id) === id)
+        .reduce(
+          (sum, line) =>
+            sum +
+            toNum(line.food_deduction) +
+            toNum(line.prev_advance) +
+            toNum(line.other_deduction),
+          0,
+        ),
+    [payrollBatches],
+  );
   const daysInMonth = month
     ? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()
     : 0;
@@ -249,7 +333,15 @@ export function AttendanceReportTab({ employees }: Props) {
   const siteRows = useMemo(() => {
     const grouped = new Map<
       number,
-      { employee: Employee | undefined; days: number; hours: number }
+      {
+        employee: Employee | undefined;
+        days: number;
+        hours: number;
+        present: number;
+        absent: number;
+        overtime: number;
+        deductions: number;
+      }
     >();
     reportRows
       .filter((entry) => entry.site === site)
@@ -258,34 +350,47 @@ export function AttendanceReportTab({ employees }: Props) {
           employee: employees.find((employee) => employee.id === entry.employee_id),
           days: 0,
           hours: 0,
+          present: 0,
+          absent: 0,
+          overtime: 0,
+          deductions: employeeDeductions(entry.employee_id),
         };
         if (isWorked(entry)) {
           current.days += 1;
           current.hours += netHours(entry);
         }
+        if (isWorked(entry)) current.present += 1;
+        if (entry.status === "ABSENT") current.absent += 1;
+        current.overtime += toNum(entry.overtime_hours);
         grouped.set(entry.employee_id, current);
       });
     return [...grouped.entries()]
       .map(([id, summary]) => ({ id, ...summary }))
       .sort((a, b) => (a.employee?.name ?? "").localeCompare(b.employee?.name ?? ""));
-  }, [employees, reportRows, site]);
+  }, [employeeDeductions, employees, reportRows, site]);
 
   const siteTotals = siteRows.reduce(
     (totals, worker) => ({
       days: totals.days + worker.days,
       hours: totals.hours + worker.hours,
+      present: totals.present + worker.present,
+      absent: totals.absent + worker.absent,
+      overtime: totals.overtime + worker.overtime,
+      deductions: totals.deductions + worker.deductions,
     }),
-    { days: 0, hours: 0 },
+    { days: 0, hours: 0, present: 0, absent: 0, overtime: 0, deductions: 0 },
   );
-  const staffTotals = employeeRows
-    .filter((entry) => entry.status === "PRESENT" || entry.status === "HALF_DAY")
-    .reduce(
-      (totals, entry) => ({
-        days: totals.days + 1,
-        hours: totals.hours + netHours(entry),
-      }),
-      { days: 0, hours: 0 },
-    );
+  const staffTotals = employeeRows.reduce(
+    (totals, entry) => ({
+      days: totals.days + (isWorked(entry) ? 1 : 0),
+      hours: totals.hours + (isWorked(entry) ? netHours(entry) : 0),
+      present: totals.present + (isWorked(entry) ? 1 : 0),
+      absent: totals.absent + (entry.status === "ABSENT" ? 1 : 0),
+      overtime: totals.overtime + toNum(entry.overtime_hours),
+    }),
+    { days: 0, hours: 0, present: 0, absent: 0, overtime: 0 },
+  );
+  const selectedDeductions = selectedEmployee ? employeeDeductions(selectedEmployee.id) : 0;
 
   return (
     <section className="attendance-report-print space-y-4">
@@ -405,8 +510,15 @@ export function AttendanceReportTab({ employees }: Props) {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {[
                 { label: "Employee", value: selectedEmployee.name, icon: Users },
-                { label: "Days present", value: staffTotals.days, icon: CalendarDays },
+                { label: "Total present", value: staffTotals.present, icon: CalendarDays },
+                { label: "Total absent", value: staffTotals.absent, icon: Users },
                 { label: "Hours logged", value: fmt(staffTotals.hours), icon: Clock3 },
+                { label: "OT hours", value: fmt(staffTotals.overtime), icon: Clock3 },
+                {
+                  label: "Deductions (month, all sites)",
+                  value: fmt(selectedDeductions),
+                  icon: MapPin,
+                },
               ].map(({ label, value, icon: Icon }) => (
                 <div key={label} className={card + " flex min-w-0 items-center gap-3 p-3"}>
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-navy-soft text-navy">
@@ -423,7 +535,7 @@ export function AttendanceReportTab({ employees }: Props) {
             </div>
             <AttendanceMatrix
               title={`${selectedEmployee.name} · ${monthLabel(month)}`}
-              description="Daily net hours. Hover or focus a cell to see shift times and break."
+              description="Daily net hours. Deductions show the payroll-month total across all sites; hover or focus a cell for shift details."
               days={reportDays}
               rows={[
                 {
@@ -431,9 +543,14 @@ export function AttendanceReportTab({ employees }: Props) {
                   name: selectedEmployee.name,
                   trade: selectedEmployee.trade,
                   hours: staffTotals.hours,
+                  present: staffTotals.present,
+                  absent: staffTotals.absent,
+                  overtime: staffTotals.overtime,
+                  deductions: selectedDeductions,
                 },
               ]}
               entryByEmployeeDay={entryByEmployeeDay}
+              columnEntries={employeeRows}
             />
           </>
         )
@@ -446,11 +563,18 @@ export function AttendanceReportTab({ employees }: Props) {
           <h2 className="attendance-report-print-only">
             Attendance Report · {site} · {monthLabel(month)}
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
               { label: "Workers", value: siteRows.length, icon: Users },
-              { label: "Days present", value: siteTotals.days, icon: CalendarDays },
+              { label: "Total present", value: siteTotals.present, icon: CalendarDays },
+              { label: "Total absent", value: siteTotals.absent, icon: Users },
               { label: "Hours contributed", value: fmt(siteTotals.hours), icon: Clock3 },
+              { label: "OT hours", value: fmt(siteTotals.overtime), icon: Clock3 },
+              {
+                label: "Deductions (month, all sites)",
+                value: fmt(siteTotals.deductions),
+                icon: MapPin,
+              },
             ].map(({ label, value, icon: Icon }) => (
               <div key={label} className={card + " min-w-0 p-3"}>
                 <div className="flex items-center gap-2 text-navy">
@@ -467,15 +591,20 @@ export function AttendanceReportTab({ employees }: Props) {
           </div>
           <AttendanceMatrix
             title={`${monthLabel(month)} · ${site}`}
-            description="T means the employee worked at another site. Hover or focus a cell for site and shift details."
+            description="T means the employee worked at another site. Deductions show each employee’s payroll-month total across all sites."
             days={reportDays}
             rows={siteRows.map((worker) => ({
               id: worker.id,
               name: worker.employee?.name ?? "Former employee",
               trade: worker.employee?.trade ?? "—",
               hours: worker.hours,
+              present: worker.present,
+              absent: worker.absent,
+              overtime: worker.overtime,
+              deductions: worker.deductions,
             }))}
             entryByEmployeeDay={entryByEmployeeDay}
+            columnEntries={reportRows.filter((entry) => entry.site === site)}
             site={site}
           />
         </>

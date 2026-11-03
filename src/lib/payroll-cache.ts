@@ -87,10 +87,13 @@ async function fetchAllRows(table: PayrollCacheTable) {
 async function replaceSnapshot(userId: string, snapshots: Map<PayrollCacheTable, unknown[]>) {
   await cache.transaction("rw", cache.rows, async () => {
     for (const table of CACHE_TABLES) {
-      await cache.rows.where("[user_id+table_name]").equals([userId, table]).delete();
       const snapshot = snapshots.get(table);
-      if (!snapshot) throw new Error(`The initial ${table} snapshot is missing.`);
+      if (!snapshot) {
+        await cache.rows.where("[user_id+table_name]").equals([userId, table]).delete();
+        continue;
+      }
       const rows = snapshot.map((row) => toCachedRow(userId, table, row));
+      await cache.rows.where("[user_id+table_name]").equals([userId, table]).delete();
       if (rows.length) await cache.rows.bulkPut(rows);
     }
   });
@@ -135,6 +138,7 @@ export async function initializePayrollCache(
   userId: string,
   queryClient: QueryClient,
   onRealtimeError: (message: string) => void,
+  deleteOnly = false,
 ) {
   const currentInitialization = ++initializationId;
   activeUserId = userId;
@@ -148,8 +152,11 @@ export async function initializePayrollCache(
     table: PayrollCacheTable;
     event: { eventType: string; new: unknown; old: unknown };
   }> = [];
+  const activeTables: readonly PayrollCacheTable[] = deleteOnly
+    ? ["employees", "payroll_batches"]
+    : CACHE_TABLES;
   const channel = supabase.channel(`payroll-cache-${userId}`);
-  for (const table of CACHE_TABLES) {
+  for (const table of activeTables) {
     channel.on("postgres_changes", { event: "*", schema: "public", table }, (event) => {
       const normalized = {
         eventType: event.eventType,
@@ -185,7 +192,7 @@ export async function initializePayrollCache(
     await subscribed;
     const snapshots = new Map<PayrollCacheTable, unknown[]>(
       await Promise.all(
-        CACHE_TABLES.map(async (table) => [table, await fetchAllRows(table)] as const),
+        activeTables.map(async (table) => [table, await fetchAllRows(table)] as const),
       ),
     );
     await replaceSnapshot(userId, snapshots);

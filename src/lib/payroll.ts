@@ -6,6 +6,7 @@ export interface Employee {
   trade: string;
   id_number: string;
   hourly_rate: number;
+  default_food_deduction: number;
   status: EmployeeStatus;
 }
 
@@ -35,6 +36,8 @@ export interface PayrollLine {
   net_pay?: number | string | null;
   rate_segments?: PayrollRateSegment[] | null | undefined;
   overtime_multiplier?: number | null;
+  days_worked?: number;
+  site?: string;
 }
 
 export interface PayrollRateSegment {

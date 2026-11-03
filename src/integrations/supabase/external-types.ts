@@ -38,6 +38,7 @@ export type Database = {
       employees: {
         Row: {
           created_at: string;
+          default_food_deduction: number;
           hourly_rate: number;
           id: number;
           id_number: string;
@@ -47,6 +48,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          default_food_deduction?: number;
           hourly_rate?: number;
           id?: number;
           id_number?: string;
@@ -56,6 +58,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          default_food_deduction?: number;
           hourly_rate?: number;
           id?: number;
           id_number?: string;

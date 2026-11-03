@@ -14,8 +14,25 @@ export interface DiagnosticCheck {
 const REQUIRED: Record<string, string[]> = {
   employees: ["id", "name", "hourly_rate", "status"],
   payroll_batches: ["id", "month", "site", "foreman"],
-  payroll_lines: ["id", "batch_id", "employee_id", "month", "hours", "rate", "food_deduction", "prev_advance", "new_advance", "paid"],
-  employee_salary_history: ["employee_id", "hourly_rate", "effective_from", "effective_on", "created_at"],
+  payroll_lines: [
+    "id",
+    "batch_id",
+    "employee_id",
+    "month",
+    "hours",
+    "rate",
+    "food_deduction",
+    "prev_advance",
+    "new_advance",
+    "paid",
+  ],
+  employee_salary_history: [
+    "employee_id",
+    "hourly_rate",
+    "effective_from",
+    "effective_on",
+    "created_at",
+  ],
   advance_transactions: ["id", "employee_id", "date", "amount"],
   employee_site_assignments: ["employee_id", "site", "effective_from", "effective_to"],
 };
@@ -23,13 +40,20 @@ const REQUIRED: Record<string, string[]> = {
 export const runDiagnostics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (
+      typeof context.claims["email"] === "string" &&
+      context.claims["email"].trim().toLowerCase() === "iqbalussain@gmail.com"
+    ) {
+      throw new Error("This account is restricted to deleting employees, sites, and payroll.");
+    }
     const { data: me, error: roleError } = await (context.supabase as SupabaseClient<any>)
       .from("users")
       .select("role,is_active")
       .eq("user_id", context.userId)
       .maybeSingle();
     if (roleError) throw new Error(`Could not verify administrator access: ${roleError.message}`);
-    if (me?.role !== "admin" || !me.is_active) throw new Error("Only administrators can run diagnostics.");
+    if (me?.role !== "admin" || !me.is_active)
+      throw new Error("Only administrators can run diagnostics.");
 
     const admin = (await import("@/integrations/supabase/client.server"))
       .supabaseAdmin as unknown as SupabaseClient<any>;

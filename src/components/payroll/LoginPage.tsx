@@ -5,6 +5,7 @@ import {
   EyeOff,
   Fingerprint,
   HardHat,
+  LoaderCircle,
   LockKeyhole,
   Mail,
   ShieldCheck,
@@ -185,6 +186,7 @@ export function LoginPage() {
                     disabled={submitting}
                     className="h-12 w-full rounded-xl bg-navy text-base font-bold hover:bg-navy-dark"
                   >
+                    {submitting ? <LoaderCircle size={16} className="animate-spin" /> : null}
                     {submitting ? "Signing in…" : "Sign in"}
                     {!submitting && <ArrowRight size={17} />}
                   </Button>

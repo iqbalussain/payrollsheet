@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Pencil, Plus, UserRound, X } from "lucide-react";
+import { Check, LoaderCircle, Pencil, Plus, UserRound, X } from "lucide-react";
 import { dbAny } from "@/integrations/supabase/external-client";
 import { useActiveForemen, useManagedUsers, useProjects } from "@/lib/management-data";
 import type { ManagedUser, Project } from "@/lib/management-data";
@@ -393,7 +393,11 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
           </label>
           <div className="flex items-end">
             <button type="submit" className={btnPrimary} disabled={saveUser.isPending}>
-              <Check size={15} />
+              {saveUser.isPending ? (
+                <LoaderCircle size={15} className="animate-spin" />
+              ) : (
+                <Check size={15} />
+              )}
               {saveUser.isPending
                 ? "Saving…"
                 : userDraft.userId
@@ -604,7 +608,11 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
           </label>
           <div className="flex items-end">
             <button type="submit" className={btnPrimary} disabled={saveProject.isPending}>
-              <Plus size={15} />
+              {saveProject.isPending ? (
+                <LoaderCircle size={15} className="animate-spin" />
+              ) : (
+                <Plus size={15} />
+              )}
               {saveProject.isPending
                 ? "Saving…"
                 : projectDraft.projectId

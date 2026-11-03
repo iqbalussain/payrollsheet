@@ -6,6 +6,7 @@ import {
   CalendarHeart,
   Check,
   Clock3,
+  LoaderCircle,
   Plus,
   Search,
   X,
@@ -468,8 +469,12 @@ export function WorkforceTab({
             disabled={saveRate.isPending}
             onClick={() => saveRate.mutate()}
           >
-            <Plus size={15} />
-            Record rate
+            {saveRate.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+            {saveRate.isPending ? "Saving…" : "Record rate"}
           </button>
         </div>
         <div className="max-h-56 overflow-auto rounded-lg border border-border">
@@ -557,8 +562,12 @@ export function WorkforceTab({
             disabled={saveTransfer.isPending}
             onClick={() => saveTransfer.mutate()}
           >
-            <Plus size={15} />
-            Request transfer
+            {saveTransfer.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+            {saveTransfer.isPending ? "Submitting…" : "Request transfer"}
           </button>
         </div>
         <input
@@ -586,17 +595,27 @@ export function WorkforceTab({
                 <>
                   <button
                     className={btnOutline}
+                    disabled={reviewTransfer.isPending}
                     onClick={() => reviewTransfer.mutate({ id: request.id, status: "APPROVED" })}
                   >
-                    <Check size={14} />
-                    Approve
+                    {reviewTransfer.isPending ? (
+                      <LoaderCircle size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                    {reviewTransfer.isPending ? "Saving…" : "Approve"}
                   </button>
                   <button
                     className={btnOutline}
+                    disabled={reviewTransfer.isPending}
                     onClick={() => reviewTransfer.mutate({ id: request.id, status: "REJECTED" })}
                   >
-                    <X size={14} />
-                    Reject
+                    {reviewTransfer.isPending ? (
+                      <LoaderCircle size={14} className="animate-spin" />
+                    ) : (
+                      <X size={14} />
+                    )}
+                    {reviewTransfer.isPending ? "Saving…" : "Reject"}
                   </button>
                 </>
               )}
@@ -741,7 +760,11 @@ export function WorkforceTab({
                     }
                     onClick={() => assignEmployees.mutate()}
                   >
-                    <BriefcaseBusiness size={15} />
+                    {assignEmployees.isPending ? (
+                      <LoaderCircle size={15} className="animate-spin" />
+                    ) : (
+                      <BriefcaseBusiness size={15} />
+                    )}
                     {assignEmployees.isPending
                       ? "Assigning…"
                       : `Assign ${assignmentEmployeeIds.length || ""} to site`}
@@ -823,8 +846,12 @@ export function WorkforceTab({
             disabled={saveLeaveType.isPending}
             onClick={() => saveLeaveType.mutate()}
           >
-            <Plus size={15} />
-            Add leave type
+            {saveLeaveType.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+            {saveLeaveType.isPending ? "Saving…" : "Add leave type"}
           </button>
         </div>
         <div className="grid gap-3 sm:grid-cols-4">
@@ -886,8 +913,12 @@ export function WorkforceTab({
             disabled={submitLeave.isPending}
             onClick={() => submitLeave.mutate()}
           >
-            <Plus size={15} />
-            Submit leave
+            {submitLeave.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <Plus size={15} />
+            )}
+            {submitLeave.isPending ? "Submitting…" : "Submit leave"}
           </button>
         </div>
         <div className="max-h-60 space-y-2 overflow-auto">
@@ -920,17 +951,27 @@ export function WorkforceTab({
                   <>
                     <button
                       className={btnOutline}
+                      disabled={reviewLeave.isPending}
                       onClick={() => reviewLeave.mutate({ id: r.id, status: "APPROVED" })}
                     >
-                      <Check size={14} />
-                      Approve
+                      {reviewLeave.isPending ? (
+                        <LoaderCircle size={14} className="animate-spin" />
+                      ) : (
+                        <Check size={14} />
+                      )}
+                      {reviewLeave.isPending ? "Saving…" : "Approve"}
                     </button>
                     <button
                       className={btnOutline}
+                      disabled={reviewLeave.isPending}
                       onClick={() => reviewLeave.mutate({ id: r.id, status: "REJECTED" })}
                     >
-                      <X size={14} />
-                      Reject
+                      {reviewLeave.isPending ? (
+                        <LoaderCircle size={14} className="animate-spin" />
+                      ) : (
+                        <X size={14} />
+                      )}
+                      {reviewLeave.isPending ? "Saving…" : "Reject"}
                     </button>
                   </>
                 )}
