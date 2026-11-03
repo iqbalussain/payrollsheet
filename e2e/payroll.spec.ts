@@ -648,16 +648,20 @@ test("employee creation rejects duplicate IDs and applies the configured food de
   expect(backend.state.employees[1]?.["default_food_deduction"]).toBe(5);
 });
 
-test("delete-only account cannot navigate to other application actions", async ({ page }) => {
+test("authorized admin gets the private delete page and full admin access", async ({ page }) => {
   await mockPayrollBackend(page, "admin", false, "iqbalussain@gmail.com");
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
 
-  await expect(page.getByRole("heading", { name: "Delete records" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Delete records" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Monthly Payroll" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Employees" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Add passkey" })).toHaveCount(0);
+  for (const label of ["Overview", "Employees", "Monthly Payroll", "Managing", "Diagnostics"]) {
+    await expect(page.getByRole("button", { name: label })).toBeVisible();
+  }
+  await expect(page.getByRole("button", { name: "Add passkey" })).toBeVisible();
+  await openTab(page, "Employees", false);
+  await expect(page.getByRole("button", { name: "New employee" })).toBeVisible();
+  await openTab(page, "Delete records", false);
+  await expect(page.getByRole("heading", { name: "Delete records" })).toBeVisible();
 });
 
 test("salary slip selection persists when filtering employees", async ({ page }) => {
@@ -741,6 +745,7 @@ test("payroll save errors include the database message", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Monthly Payroll", false);
+  await expect(page.getByRole("button", { name: "Delete records" })).toHaveCount(0);
   await page.getByLabel("Site for payroll generation").selectOption("North Campus");
   await page.getByRole("button", { name: "Generate Batch from Timesheets" }).click();
 
@@ -1324,6 +1329,7 @@ test("HR can prepare payroll but does not get approval or deletion controls", as
   await page.goto("/");
   await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
   await openTab(page, "Monthly Payroll", false);
+  await expect(page.getByRole("button", { name: "Delete records" })).toHaveCount(0);
   await page.getByLabel("Site for payroll generation").selectOption("North Campus");
   await page.getByRole("button", { name: "Generate Batch from Timesheets" }).click();
   const dialog = page.getByRole("dialog");

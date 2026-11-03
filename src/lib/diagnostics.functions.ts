@@ -40,12 +40,6 @@ const REQUIRED: Record<string, string[]> = {
 export const runDiagnostics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    if (
-      typeof context.claims["email"] === "string" &&
-      context.claims["email"].trim().toLowerCase() === "iqbalussain@gmail.com"
-    ) {
-      throw new Error("This account is restricted to deleting employees, sites, and payroll.");
-    }
     const { data: me, error: roleError } = await (context.supabase as SupabaseClient<any>)
       .from("users")
       .select("role,is_active")

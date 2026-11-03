@@ -283,10 +283,8 @@ function Dashboard({
   userId: string;
 }) {
   const queryClient = useQueryClient();
-  const isDeleteOnly = email.trim().toLowerCase() === "iqbalussain@gmail.com";
-  const [tab, setTab] = useState<TabId>(
-    isDeleteOnly ? "deletions" : role === "foreman" ? "timesheets" : "overview",
-  );
+  const canAccessDeletePage = email.trim().toLowerCase() === "iqbalussain@gmail.com";
+  const [tab, setTab] = useState<TabId>(role === "foreman" ? "timesheets" : "overview");
   const [mode, setMode] = useState<ModalMode>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [duplicateIdError, setDuplicateIdError] = useState("");
@@ -306,10 +304,10 @@ function Dashboard({
     ["overview", "history", "slips", "advances", "deletions"].includes(tab) || mode !== null;
   const batchesQuery = useBatches(undefined, cacheReady && needsPayrollHistory);
   const saveEmployee = useSaveEmployee();
-  const canDelete = role === "admin" && !isDeleteOnly;
+  const canDelete = role === "admin";
   const foodSettingsQuery = useQuery({
     queryKey: ["payroll_settings", "default_food_deduction"],
-    enabled: cacheReady && !isDeleteOnly && ["admin", "hr"].includes(role),
+    enabled: cacheReady && ["admin", "hr"].includes(role),
     queryFn: async () => {
       const { data, error } = await dbAny
         .from("payroll_settings")
@@ -339,8 +337,7 @@ function Dashboard({
       }),
   });
   const availableTabs = TABS.filter((item) => {
-    if (isDeleteOnly) return "deleteOnly" in item && item.deleteOnly;
-    if ("deleteOnly" in item && item.deleteOnly) return false;
+    if ("deleteOnly" in item && item.deleteOnly) return canAccessDeletePage;
     if ("adminOnly" in item && item.adminOnly && !canDelete) return false;
     if (role === "foreman") return item.id === "timesheets" || item.id === "workforce";
     if (role === "manager") {
@@ -371,11 +368,8 @@ function Dashboard({
     let stop: (() => Promise<void>) | undefined;
     setCacheState("loading");
     setCacheError("");
-    void initializePayrollCache(
-      userId,
-      queryClient,
-      (message) => setToast({ msg: message, tone: "warn" }),
-      isDeleteOnly,
+    void initializePayrollCache(userId, queryClient, (message) =>
+      setToast({ msg: message, tone: "warn" }),
     )
       .then((dispose) => {
         stop = dispose;
@@ -396,7 +390,7 @@ function Dashboard({
       active = false;
       if (stop) void stop();
     };
-  }, [cacheAttempt, isDeleteOnly, queryClient, userId]);
+  }, [cacheAttempt, queryClient, userId]);
 
   const employees: Employee[] = employeesQuery.data ?? [];
   const batches: PayrollBatch[] = batchesQuery.data ?? [];
@@ -619,7 +613,7 @@ function Dashboard({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (!isDeleteOnly && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandOpen(true);
       }
@@ -631,7 +625,7 @@ function Dashboard({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isDeleteOnly]);
+  }, []);
 
   if (cacheState === "loading") {
     return (
@@ -707,43 +701,39 @@ function Dashboard({
           ))}
         </div>
         <div className="floating-menu-tools">
-          {!isDeleteOnly && (
-            <button
-              type="button"
-              onClick={(event) => {
-                setMobileMenuOpen(false);
-                setCommandOpen(true);
-                if (event.detail > 0) event.currentTarget.blur();
-              }}
-              aria-label="Search and commands"
-              title="Search / commands (Ctrl+K)"
-              className="floating-menu-button"
-            >
-              <Search size={18} />
-              <span className="floating-menu-mobile-label">Search / commands</span>
-              <span className="floating-menu-tooltip">Search / commands</span>
-            </button>
-          )}
-          {!isDeleteOnly && (
-            <button
-              type="button"
-              onClick={(event) => {
-                setMobileMenuOpen(false);
-                if (event.detail > 0) event.currentTarget.blur();
-                void addPasskey();
-              }}
-              disabled={registeringPasskey}
-              aria-label="Add passkey"
-              title={registeringPasskey ? "Adding passkey…" : "Add passkey"}
-              className="floating-menu-button"
-            >
-              <KeyRound size={18} />
-              <span className="floating-menu-mobile-label">Add passkey</span>
-              <span className="floating-menu-tooltip">
-                {registeringPasskey ? "Adding passkey…" : "Add passkey"}
-              </span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={(event) => {
+              setMobileMenuOpen(false);
+              setCommandOpen(true);
+              if (event.detail > 0) event.currentTarget.blur();
+            }}
+            aria-label="Search and commands"
+            title="Search / commands (Ctrl+K)"
+            className="floating-menu-button"
+          >
+            <Search size={18} />
+            <span className="floating-menu-mobile-label">Search / commands</span>
+            <span className="floating-menu-tooltip">Search / commands</span>
+          </button>
+          <button
+            type="button"
+            onClick={(event) => {
+              setMobileMenuOpen(false);
+              if (event.detail > 0) event.currentTarget.blur();
+              void addPasskey();
+            }}
+            disabled={registeringPasskey}
+            aria-label="Add passkey"
+            title={registeringPasskey ? "Adding passkey…" : "Add passkey"}
+            className="floating-menu-button"
+          >
+            <KeyRound size={18} />
+            <span className="floating-menu-mobile-label">Add passkey</span>
+            <span className="floating-menu-tooltip">
+              {registeringPasskey ? "Adding passkey…" : "Add passkey"}
+            </span>
+          </button>
           <button
             type="button"
             onClick={(event) => {
@@ -832,7 +822,7 @@ function Dashboard({
                 canDelete={canDelete}
                 defaultFoodDeduction={foodSettingsQuery.data ?? 0}
                 savingFoodDeductionDefault={saveFoodDefault.isPending}
-                canManageFoodDeductionDefault={role === "admin" && !isDeleteOnly}
+                canManageFoodDeductionDefault={role === "admin"}
                 onDefaultFoodDeductionChange={async (value) => {
                   try {
                     await saveFoodDefault.mutateAsync(value);
@@ -908,7 +898,7 @@ function Dashboard({
             {tab === "audit" && canDelete && <AuditHistoryTab />}
             {tab === "managing" && canDelete && <ManagementTab currentUserId={userId} />}
             {tab === "diagnostics" && canDelete && <DiagnosticsTab />}
-            {tab === "deletions" && isDeleteOnly && (
+            {tab === "deletions" && canAccessDeletePage && (
               <DeleteOnlyTab
                 employees={employees}
                 batches={batches}

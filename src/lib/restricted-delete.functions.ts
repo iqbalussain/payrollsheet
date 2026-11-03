@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const DELETE_ONLY_EMAIL = "iqbalussain@gmail.com";
 const deleteInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("employee"), id: z.number().int().positive() }),
   z.object({ type: z.literal("site"), id: z.string().uuid() }),
@@ -15,10 +14,6 @@ export const deletePayrollRecord = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => deleteInput.parse(data))
   .handler(async ({ data, context }) => {
-    const email =
-      typeof context.claims["email"] === "string"
-        ? context.claims["email"].trim().toLowerCase()
-        : "";
     const authDb = context.supabase as SupabaseClient<any>;
     const { data: profile, error: profileError } = await authDb
       .from("users")
@@ -27,11 +22,8 @@ export const deletePayrollRecord = createServerFn({ method: "POST" })
       .maybeSingle();
     if (profileError) throw new Error(`Could not verify delete access: ${profileError.message}`);
     if (!profile?.is_active) throw new Error("This account is inactive.");
-    const isDeleteOnly = email === DELETE_ONLY_EMAIL;
-    if (!isDeleteOnly && profile.role !== "admin") {
-      throw new Error(
-        "Only an administrator or the authorized delete-only account can delete records.",
-      );
+    if (profile.role !== "admin") {
+      throw new Error("Only an active administrator can delete records.");
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

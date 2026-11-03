@@ -40,13 +40,6 @@ async function assertAdmin(context: {
   supabase: SupabaseClient<any>;
   claims: Record<string, unknown>;
 }) {
-  const email =
-    typeof context.claims?.["email"] === "string"
-      ? context.claims["email"].trim().toLowerCase()
-      : "";
-  if (email === "iqbalussain@gmail.com") {
-    throw new Error("This account is restricted to deleting employees, sites, and payroll.");
-  }
   const { data, error } = await context.supabase
     .from("users")
     .select("role,is_active")
