@@ -15,13 +15,13 @@ import type { Employee } from "@/lib/payroll";
 import { dbAny } from "@/integrations/supabase/external-client";
 import { useProjects } from "@/lib/management-data";
 import { projectAccessError } from "@/lib/project-access";
+import { normalizeSalaryHistory, salaryHistoryInsert, type SalaryHistoryRecord } from "@/lib/salary-history";
 import { btnGold, btnOutline, btnPrimary, card, input, select } from "./ui";
 
-interface SalaryRecord {
+interface SalaryRecord extends SalaryHistoryRecord {
   id: string;
   employee_id: number;
   hourly_rate: number;
-  effective_on: string;
   created_at: string;
 }
 interface Assignment {
@@ -111,10 +111,15 @@ export function WorkforceTab({
     queryFn: async () => {
       const { data, error } = await dbAny
         .from("employee_salary_history")
-        .select("*")
-        .order("effective_on", { ascending: false });
+        .select("*");
       if (error) throw error;
-      return (data ?? []) as SalaryRecord[];
+      return (data ?? []).map((row: Record<string, unknown>) => ({
+        ...row,
+        ...normalizeSalaryHistory([row])[0],
+      })).sort((a: SalaryRecord, b: SalaryRecord) =>
+        (b.effective_from ?? "").localeCompare(a.effective_from ?? "") ||
+        b.created_at.localeCompare(a.created_at),
+      ) as SalaryRecord[];
     },
   });
   const payrollSettings = useQuery({
@@ -218,7 +223,7 @@ export function WorkforceTab({
       } else {
         const { error } = await dbAny
           .from("employee_salary_history")
-          .insert({ employee_id: id, hourly_rate: amount, effective_on: rateDate });
+          .insert(salaryHistoryInsert(id, amount, rateDate));
         if (error) throw error;
       }
     },
@@ -494,7 +499,7 @@ export function WorkforceTab({
                     {employees.find((e) => e.id === r.employee_id)?.name ??
                       `Employee ${r.employee_id}`}
                   </td>
-                  <td className="p-2">{r.effective_on}</td>
+                  <td className="p-2">{r.effective_from ?? "Unknown"}</td>
                   <td className="p-2 text-right">{Number(r.hourly_rate).toFixed(3)}</td>
                   <td className="p-2">{new Date(r.created_at).toLocaleDateString()}</td>
                 </tr>
