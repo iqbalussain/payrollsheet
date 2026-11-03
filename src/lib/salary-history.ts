@@ -5,6 +5,11 @@ export interface SalaryHistoryRecord {
   created_at?: string | undefined;
 }
 
+/** New changes use the same canonical date column that payroll reads. */
+export function salaryHistoryInsert(employeeId: number, hourlyRate: number, effectiveDate: string) {
+  return { employee_id: employeeId, hourly_rate: hourlyRate, effective_from: effectiveDate };
+}
+
 /** Accept rows using either `effective_from` or legacy `effective_on`. */
 export function normalizeSalaryHistory(rows: Array<Record<string, unknown>>): SalaryHistoryRecord[] {
   return rows.map((row) => {
