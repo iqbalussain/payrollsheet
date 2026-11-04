@@ -1,8 +1,0 @@
-- [ ] Update Cost Allocation list, details and exports to requested salary breakdown.
-- [ ] Add compact Daily Attendance search/status filtering without altering selection or saving.
-- [ ] Update vulnerable PDF dependency and verify relevant checks.
-- [x] Correct individual monthly attendance saving and verify saved entries reload without submitting calculated database fields.
-- [x] Show actionable individual attendance save errors while retaining entries for correction and retry.
-- [x] Document external salary-history schema repair and private timesheet bucket provisioning; surface actionable missing-bucket errors.
-- [x] Correct attendance report landscape printing and verify column alignment.
-- [ ] Clear existing photo-parser build errors and test undated salary-history handling.
