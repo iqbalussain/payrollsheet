@@ -512,7 +512,8 @@ export function PayrollTab({
   const timesheetsError =
     timesheetsQuery.error instanceof Error ? timesheetsQuery.error.message : "";
   const projectsError = projectsQuery.error instanceof Error ? projectsQuery.error.message : "";
-  const batchesQuery = useBatches(month);
+  // Generation reuses the latest earlier deduction; the visible list stays month-filtered.
+  const batchesQuery = useBatches();
   const batches = useMemo(() => batchesQuery.data ?? [], [batchesQuery.data]);
   const payrollSettingsQuery = useQuery({
     queryKey: ["payroll_settings"],
@@ -636,7 +637,9 @@ export function PayrollTab({
           .map((line) => ({ month: batch.month, line })),
       )
       .sort((a, b) => b.month.localeCompare(a.month));
-    if (priorLines.length) return toNum(priorLines[0]!.line.food_deduction);
+    const latestPriorLine = priorLines[0];
+    if (latestPriorLine) return toNum(latestPriorLine.line.food_deduction);
+    // Zero is an explicit opt-out in the employee form, not an unset default.
     return toNum(employee?.default_food_deduction ?? defaultFoodDeduction);
   };
 
