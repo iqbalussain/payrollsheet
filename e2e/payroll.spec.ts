@@ -959,6 +959,103 @@ test("daily timesheet date changes keep the editor open and load the same batch"
   await expect(page.getByLabel("Foreman")).toHaveValue(foremanUserId);
 });
 
+for (const transferDay of [1, 16]) {
+  test(`monthly deployment overrides old attendance from day ${transferDay}`, async ({ page }) => {
+    const backend = await mockPayrollBackend(page, "admin");
+    const month = new Date().toISOString().slice(0, 7);
+    const eastId = "00000000-0000-4000-8000-000000000011";
+    const oldDay = {
+      id: randomUUID(), employee_id: 1, work_date: `${month}-02`,
+      site: "North Campus", project_id: northCampusId,
+      foreman: "Samir Foreman", foreman_user_id: foremanUserId,
+      status: "PRESENT", in_time: "08:00", out_time: "16:00",
+      total_hours: 8, regular_hours: 8, overtime_hours: 0, break_hours: 0,
+      created_at: timestamp,
+    };
+    backend.state.timesheets.push(oldDay);
+    backend.state.employee_site_assignments.push(
+      { employee_id: 1, site: "North Campus", project_id: northCampusId,
+        foreman: "Samir Foreman", foreman_user_id: foremanUserId,
+        effective_from: "2020-01-01", effective_to: `${month}-${String(transferDay - 1 || 1).padStart(2, "0")}` },
+      { employee_id: 1, site: "East Yard", project_id: eastId,
+        foreman: "", foreman_user_id: null,
+        effective_from: `${month}-${String(transferDay).padStart(2, "0")}`, effective_to: null },
+    );
+    // The previous-month lookup returns an old site, just as the real API does.
+    await page.route(`${supabaseUrl}/rest/v1/timesheets**`, async (route) => {
+      const url = new URL(route.request().url());
+      if (route.request().method() === "GET" && url.searchParams.has("limit")) {
+        await route.fulfill({ json: { ...oldDay, work_date: "2020-01-01" } });
+      } else await route.fallback();
+    });
+    await page.setViewportSize({ width: 1280, height: 1800 });
+    await page.goto("/");
+    await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
+    await openTab(page, "Daily Timesheets", false);
+    await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Search employee").fill("Asha");
+    await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+    await expect(dialog.getByLabel("Day 2 site", { exact: true })).toHaveValue(northCampusId);
+    if (transferDay === 16) {
+      await expect(dialog.getByLabel("Day 10 site", { exact: true })).toHaveValue(northCampusId);
+      await expect(dialog.getByLabel("Day 15 site", { exact: true })).toHaveValue(northCampusId);
+    }
+    await expect(dialog.getByLabel("Day 20 site", { exact: true })).toHaveValue(eastId);
+    await expect(dialog.getByLabel("Day 20 foreman", { exact: true })).toHaveValue("");
+    await dialog.getByLabel("Day 20 status", { exact: true }).selectOption("PRESENT");
+    await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
+    await expect(dialog).toBeHidden();
+    expect(backend.state.timesheets.find((row) => row["work_date"] === `${month}-20`)?.["project_id"]).toBe(eastId);
+    expect(oldDay.project_id).toBe(northCampusId);
+    await page.getByRole("button", { name: "Monthly entry", exact: true }).click();
+    await dialog.getByLabel("Search employee").fill("Asha");
+    await dialog.getByRole("button", { name: /Asha Khan/ }).click();
+    await expect(dialog.getByLabel("Day 20 site", { exact: true })).toHaveValue(eastId);
+  });
+}
+
+for (const scenario of [
+  { prior: 10, profile: 0, expected: 10 },
+  { prior: 0, profile: 5, expected: 0 },
+  { prior: null, profile: 0, expected: 0 },
+  { prior: null, profile: 5, expected: 5 },
+]) {
+  test(`generated food deduction prior ${scenario.prior} profile ${scenario.profile}`, async ({ page }) => {
+    const backend = await mockPayrollBackend(page, "admin");
+    const now = new Date();
+    const month = now.toISOString().slice(0, 7);
+    const priorMonth = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 1)).toISOString().slice(0, 7);
+    const batchId = randomUUID();
+    const employee = backend.state.employees[0];
+    if (!employee) throw new Error("Missing test employee");
+    employee["default_food_deduction"] = scenario.profile;
+    backend.state.payroll_settings[0] = { singleton: true, default_food_deduction: 7 };
+    backend.state.employee_salary_history.splice(0);
+    if (scenario.prior !== null) {
+      backend.state.payroll_batches.push({ id: batchId, month: priorMonth, site: "North Campus", status: "APPROVED", created_at: timestamp });
+      backend.state.payroll_lines.push({ id: randomUUID(), batch_id: batchId, month: priorMonth, employee_id: 1,
+        hours: 8, rate: 3, food_deduction: scenario.prior, prev_advance: 0, new_advance: 0,
+        other_deduction: 0, net_salary: 24 - scenario.prior, paid: 0 });
+    }
+    backend.state.timesheets.push({ id: randomUUID(), employee_id: 1, work_date: `${month}-05`,
+      site: "North Campus", project_id: northCampusId, foreman: "Samir Foreman", foreman_user_id: foremanUserId,
+      status: "PRESENT", regular_hours: 8, overtime_hours: 0, total_hours: 8 });
+    await page.setViewportSize({ width: 1280, height: 1800 });
+    await page.goto("/");
+    await expect(page.getByText("Syncing payroll data…")).toBeHidden({ timeout: 20_000 });
+    await openTab(page, "Monthly Payroll", false);
+    await page.getByRole("button", { name: "Generate Batch from Timesheets" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.locator('tbody tr input[type="number"]').nth(2)).toHaveValue(String(scenario.expected));
+    await dialog.getByRole("button", { name: "Save batch" }).click();
+    await expect(dialog).toBeHidden();
+    const saved = backend.state.payroll_lines.find((line) => line["batch_id"] !== batchId);
+    expect(saved?.["food_deduction"]).toBe(scenario.expected);
+    expect(saved?.["net_pay"]).toBe(24 - scenario.expected);
+  });
+}
+
 test("monthly attendance entry saves only days with a selected status", async ({
   page,
 }, testInfo) => {
