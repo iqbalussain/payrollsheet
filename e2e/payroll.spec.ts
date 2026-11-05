@@ -984,7 +984,7 @@ for (const transferDay of [1, 16]) {
     // The previous-month lookup returns an old site, just as the real API does.
     await page.route(`${supabaseUrl}/rest/v1/timesheets**`, async (route) => {
       const url = new URL(route.request().url());
-      if (route.request().method() === "GET" && url.searchParams.has("limit")) {
+      if (route.request().method() === "GET" && url.searchParams.has("employee_id") && url.searchParams.has("limit")) {
         await route.fulfill({ json: { ...oldDay, work_date: "2020-01-01" } });
       } else await route.fallback();
     });
