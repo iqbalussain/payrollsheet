@@ -1004,6 +1004,7 @@ for (const transferDay of [1, 16]) {
     await expect(dialog.getByLabel("Day 20 site", { exact: true })).toHaveValue(eastId);
     await expect(dialog.getByLabel("Day 20 foreman", { exact: true })).toHaveValue("");
     await dialog.getByLabel("Day 20 status", { exact: true }).selectOption("PRESENT");
+    await dialog.getByLabel("Day 20 foreman", { exact: true }).selectOption(foremanUserId);
     await dialog.getByRole("button", { name: "Save Individual Attendance" }).click();
     await expect(dialog).toBeHidden();
     expect(backend.state.timesheets.find((row) => row["work_date"] === `${month}-20`)?.["project_id"]).toBe(eastId);
@@ -1012,6 +1013,8 @@ for (const transferDay of [1, 16]) {
     await dialog.getByLabel("Search employee").fill("Asha");
     await dialog.getByRole("button", { name: /Asha Khan/ }).click();
     await expect(dialog.getByLabel("Day 20 site", { exact: true })).toHaveValue(eastId);
+    await expect(dialog.getByLabel("Day 20 foreman", { exact: true })).toHaveValue(foremanUserId);
+    await dialog.getByLabel("Day 20 site", { exact: true }).screenshot({ path: `/tmp/browser/monitoring-tests/transfer-${transferDay}.png` });
   });
 }
 
