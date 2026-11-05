@@ -1,12 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Camera,
-  CheckCircle2,
-  Loader2,
-  PencilLine,
-  Upload,
-} from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Loader2, PencilLine, Upload } from "lucide-react";
 
 import { btnGold, btnOutline, card, input, select } from "@/components/payroll/ui";
 import { extractAttendanceFromImage, type VisionDraftRecord } from "@/utils/visionParser";
@@ -55,15 +48,17 @@ export function AttendanceView({
 
   const scanLabel = useMemo(
     () =>
-      site && foreman ? `${site} · ${foreman}` : workDate ? `Daily attendance for ${workDate}` : "Daily attendance",
+      site && foreman
+        ? `${site} · ${foreman}`
+        : workDate
+          ? `Daily attendance for ${workDate}`
+          : "Daily attendance",
     [foreman, site, workDate],
   );
 
   const updateRow = (employeeId: number, patch: Partial<VisionDraftRecord>) => {
     setDraftRows((current) =>
-      current.map((row) =>
-        row.employeeId === employeeId ? { ...row, ...patch } : row,
-      ),
+      current.map((row) => (row.employeeId === employeeId ? { ...row, ...patch } : row)),
     );
   };
 
@@ -84,7 +79,10 @@ export function AttendanceView({
       if (parsed.warnings.length) {
         setError("The AI scan finished with warnings. Check each row before saving.");
       }
-      notify(`Photo scan complete for ${scanLabel}. Review the extracted rows before saving.`, "ok");
+      notify(
+        `Photo scan complete for ${scanLabel}. Review the extracted rows before saving.`,
+        "ok",
+      );
     } catch (caughtError) {
       const message =
         caughtError instanceof Error ? caughtError.message : "The photo scan could not finish.";
@@ -120,7 +118,9 @@ export function AttendanceView({
       setError("");
     } catch (caughtError) {
       const message =
-        caughtError instanceof Error ? caughtError.message : "The extracted attendance could not be saved.";
+        caughtError instanceof Error
+          ? caughtError.message
+          : "The extracted attendance could not be saved.";
       setError(message);
       notify(message, "warn");
     } finally {
@@ -129,7 +129,9 @@ export function AttendanceView({
   };
 
   return (
-    <div className={`${card} space-y-4 border border-navy/10 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4`}>
+    <div
+      className={`${card} space-y-4 border border-navy/10 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-navy/70">
@@ -238,9 +240,13 @@ export function AttendanceView({
                       return (
                         <tr key={row.employeeId} className="border-t border-slate-200 align-top">
                           <td className="px-2 py-2">
-                            <div className="font-semibold text-slate-800">{employee?.name ?? row.employeeName ?? `Worker ${row.employeeId}`}</div>
+                            <div className="font-semibold text-slate-800">
+                              {employee?.name ?? row.employeeName ?? `Worker ${row.employeeId}`}
+                            </div>
                             <div className="text-[10px] text-slate-500">
-                              {employee?.id_number ? `ID ${employee.id_number}` : employee?.trade ?? "Unassigned"}
+                              {employee?.id_number
+                                ? `ID ${employee.id_number}`
+                                : (employee?.trade ?? "Unassigned")}
                             </div>
                           </td>
                           <td className="px-2 py-2">
@@ -248,7 +254,9 @@ export function AttendanceView({
                               value={row.status}
                               className={`${select} h-8 rounded-md px-2 py-1 text-[11px]`}
                               onChange={(event) =>
-                                updateRow(row.employeeId, { status: event.target.value as VisionDraftRecord["status"] })
+                                updateRow(row.employeeId, {
+                                  status: event.target.value as VisionDraftRecord["status"],
+                                })
                               }
                             >
                               {VISIBILITY_OPTIONS.map((option) => (
@@ -263,7 +271,9 @@ export function AttendanceView({
                               type="time"
                               value={row.inTime ?? ""}
                               className={`${input} h-8 rounded-md px-2 py-1 text-[11px]`}
-                              onChange={(event) => updateRow(row.employeeId, { inTime: event.target.value })}
+                              onChange={(event) =>
+                                updateRow(row.employeeId, { inTime: event.target.value })
+                              }
                             />
                           </td>
                           <td className="px-2 py-2">
@@ -271,7 +281,9 @@ export function AttendanceView({
                               type="time"
                               value={row.outTime ?? ""}
                               className={`${input} h-8 rounded-md px-2 py-1 text-[11px]`}
-                              onChange={(event) => updateRow(row.employeeId, { outTime: event.target.value })}
+                              onChange={(event) =>
+                                updateRow(row.employeeId, { outTime: event.target.value })
+                              }
                             />
                           </td>
                           <td className="px-2 py-2">
@@ -281,7 +293,11 @@ export function AttendanceView({
                               step="0.25"
                               value={row.breakHours ?? 0}
                               className={`${input} h-8 rounded-md px-2 py-1 text-[11px]`}
-                              onChange={(event) => updateRow(row.employeeId, { breakHours: Number(event.target.value) || 0 })}
+                              onChange={(event) =>
+                                updateRow(row.employeeId, {
+                                  breakHours: Number(event.target.value) || 0,
+                                })
+                              }
                             />
                           </td>
                           <td className="px-2 py-2">
@@ -291,7 +307,11 @@ export function AttendanceView({
                               step="0.25"
                               value={row.regularHours ?? 0}
                               className={`${input} h-8 rounded-md px-2 py-1 text-[11px]`}
-                              onChange={(event) => updateRow(row.employeeId, { regularHours: Number(event.target.value) || 0 })}
+                              onChange={(event) =>
+                                updateRow(row.employeeId, {
+                                  regularHours: Number(event.target.value) || 0,
+                                })
+                              }
                             />
                           </td>
                           <td className="px-2 py-2">
@@ -301,7 +321,11 @@ export function AttendanceView({
                               step="0.25"
                               value={row.overtimeHours ?? 0}
                               className={`${input} h-8 rounded-md px-2 py-1 text-[11px]`}
-                              onChange={(event) => updateRow(row.employeeId, { overtimeHours: Number(event.target.value) || 0 })}
+                              onChange={(event) =>
+                                updateRow(row.employeeId, {
+                                  overtimeHours: Number(event.target.value) || 0,
+                                })
+                              }
                             />
                           </td>
                         </tr>

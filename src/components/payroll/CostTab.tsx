@@ -3,7 +3,11 @@ import { ChevronRight, List, MapPin, Users } from "lucide-react";
 import { currentPayrollMonth, fmt, type Employee } from "@/lib/payroll";
 import { btnGold, card, select } from "./ui";
 import { CostDetailsModal } from "./CostDetailsModal";
-import { usePayrollSiteAllocations, usePayrollLinesForMonth, usePayrollAdvanceBalancesBefore } from "@/lib/payroll-data";
+import {
+  usePayrollSiteAllocations,
+  usePayrollLinesForMonth,
+  usePayrollAdvanceBalancesBefore,
+} from "@/lib/payroll-data";
 import { allocationTotals, buildAllocationRows } from "@/lib/cost-allocation";
 
 type GroupBy = "site" | "foreman" | "site+foreman";
@@ -25,7 +29,8 @@ export function CostTab({ employees, notify }: Props) {
     [advanceBalancesQuery.data],
   );
   const allocationRows = useMemo(
-    () => buildAllocationRows(allocationsQuery.data ?? [], employees, linesQuery.data, openingBalances),
+    () =>
+      buildAllocationRows(allocationsQuery.data ?? [], employees, linesQuery.data, openingBalances),
     [allocationsQuery.data, employees, linesQuery.data, openingBalances],
   );
   const totals = useMemo(() => allocationTotals(allocationRows), [allocationRows]);
@@ -130,10 +135,7 @@ export function CostTab({ employees, notify }: Props) {
           { label: "Paid (OMR)", value: fmt(grand.paid), money: true },
           { label: "Balance (OMR)", value: fmt(grand.balance), money: true },
         ].map((s) => (
-          <div
-            key={s.label}
-            className={`${card} p-3.5`}
-          >
+          <div key={s.label} className={`${card} p-3.5`}>
             <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-500">
               {s.label}
             </p>
@@ -189,7 +191,13 @@ export function CostTab({ employees, notify }: Props) {
           <table className="w-full min-w-[720px] text-sm">
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[11px] font-bold uppercase tracking-wide text-slate-600">
-                <th className="px-4 py-3">{groupBy === "foreman" ? "Foreman" : groupBy === "site+foreman" ? "Site / Foreman" : "Site"}</th>
+                <th className="px-4 py-3">
+                  {groupBy === "foreman"
+                    ? "Foreman"
+                    : groupBy === "site+foreman"
+                      ? "Site / Foreman"
+                      : "Site"}
+                </th>
                 <th className="px-4 py-3 text-right">Workers</th>
                 <th className="px-4 py-3 text-right">Regular hours</th>
                 <th className="px-4 py-3 text-right">Paid (OMR)</th>
@@ -219,9 +227,7 @@ export function CostTab({ employees, notify }: Props) {
                       <td className="px-4 py-2.5 text-right text-slate-600">
                         {fmt(r.regularHours)}
                       </td>
-                      <td className="px-4 py-2.5 text-right font-bold text-money">
-                        {fmt(r.paid)}
-                      </td>
+                      <td className="px-4 py-2.5 text-right font-bold text-money">{fmt(r.paid)}</td>
                       <td className="px-4 py-2.5 text-right font-bold text-navy">
                         {fmt(r.balance)}
                       </td>

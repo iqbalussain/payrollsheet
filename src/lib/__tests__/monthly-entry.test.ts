@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { assignmentForDate, syncTimesFromHours, type SiteAssignmentRow } from "../monthly-entry";
 
-const siteA: SiteAssignmentRow = { site: "Site A", foreman: "Ali", project_id: "pA", foreman_user_id: "fA", effective_from: "2026-10-01", effective_to: "2026-10-15" };
-const siteB: SiteAssignmentRow = { site: "Site B", foreman: "Omar", project_id: "pB", foreman_user_id: "fB", effective_from: "2026-10-16", effective_to: null };
+const siteA: SiteAssignmentRow = {
+  site: "Site A",
+  foreman: "Ali",
+  project_id: "pA",
+  foreman_user_id: "fA",
+  effective_from: "2026-10-01",
+  effective_to: "2026-10-15",
+};
+const siteB: SiteAssignmentRow = {
+  site: "Site B",
+  foreman: "Omar",
+  project_id: "pB",
+  foreman_user_id: "fB",
+  effective_from: "2026-10-16",
+  effective_to: null,
+};
 
 describe("hours-to-time sync", () => {
   it("recalculates Out time from In time + hours", () => {
@@ -23,7 +37,12 @@ describe("hours-to-time sync", () => {
 
 describe("site assignment by date", () => {
   it("picks the active site for the date", () => {
-    expect(assignmentForDate([siteB], "2026-10-20")).toEqual({ site: "Site B", projectId: "pB", foreman: "Omar", foremanUserId: "fB" });
+    expect(assignmentForDate([siteB], "2026-10-20")).toEqual({
+      site: "Site B",
+      projectId: "pB",
+      foreman: "Omar",
+      foremanUserId: "fB",
+    });
   });
   it("mid-month transfer: day 10 -> Site A, day 20 -> Site B", () => {
     expect(assignmentForDate([siteA, siteB], "2026-10-10")?.site).toBe("Site A");

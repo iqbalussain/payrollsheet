@@ -30,7 +30,10 @@ export function syncTimesFromHours(inTime: string, hoursText: string) {
 }
 
 /** Active deployment for a date (YYYY-MM-DD); null when none (unassigned). */
-export function assignmentForDate(assignments: SiteAssignmentRow[] | null | undefined, date: string): DaySite | null {
+export function assignmentForDate(
+  assignments: SiteAssignmentRow[] | null | undefined,
+  date: string,
+): DaySite | null {
   const match = (assignments ?? [])
     .filter((a) => a.effective_from <= date && (!a.effective_to || a.effective_to >= date))
     .sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];

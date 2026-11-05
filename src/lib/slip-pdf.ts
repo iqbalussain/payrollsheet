@@ -43,7 +43,13 @@ function fitFontSize(doc: jsPDF, text: string, maxWidth: number, preferred: numb
   return minimum;
 }
 
-function fitText(doc: jsPDF, text: string, maxWidth: number, preferred: number, minimum = 6): string {
+function fitText(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number,
+  preferred: number,
+  minimum = 6,
+): string {
   fitFontSize(doc, text, maxWidth, preferred, minimum);
   if (doc.getTextWidth(text) <= maxWidth) return text;
   let truncated = text;

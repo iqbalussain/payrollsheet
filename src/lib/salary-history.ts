@@ -11,7 +11,9 @@ export function salaryHistoryInsert(employeeId: number, hourlyRate: number, effe
 }
 
 /** Accept rows using either `effective_from` or legacy `effective_on`. */
-export function normalizeSalaryHistory(rows: Array<Record<string, unknown>>): SalaryHistoryRecord[] {
+export function normalizeSalaryHistory(
+  rows: Array<Record<string, unknown>>,
+): SalaryHistoryRecord[] {
   return rows.map((row) => {
     const date = row["effective_from"] ?? row["effective_on"];
     return {
@@ -30,14 +32,18 @@ export function effectiveRateOnDate(
   history: SalaryHistoryRecord[],
 ) {
   return history
-    .filter((record): record is SalaryHistoryRecord & { effective_from: string } =>
-      record.employee_id === employeeId &&
-      typeof record.effective_from === "string" &&
-      /^\d{4}-\d{2}-\d{2}$/.test(record.effective_from) &&
-      record.effective_from <= workDate,
+    .filter(
+      (record): record is SalaryHistoryRecord & { effective_from: string } =>
+        record.employee_id === employeeId &&
+        typeof record.effective_from === "string" &&
+        /^\d{4}-\d{2}-\d{2}$/.test(record.effective_from) &&
+        record.effective_from <= workDate,
     )
-    .sort((a, b) => b.effective_from.localeCompare(a.effective_from) ||
-      (b.created_at ?? "").localeCompare(a.created_at ?? ""))[0]?.hourly_rate;
+    .sort(
+      (a, b) =>
+        b.effective_from.localeCompare(a.effective_from) ||
+        (b.created_at ?? "").localeCompare(a.created_at ?? ""),
+    )[0]?.hourly_rate;
 }
 
 export function effectiveRateForMonth(

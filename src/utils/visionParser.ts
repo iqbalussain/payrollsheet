@@ -1,12 +1,6 @@
 import { db } from "@/integrations/supabase/external-client";
 
-export type VisionStatus =
-  | "PRESENT"
-  | "ABSENT"
-  | "HALF_DAY"
-  | "LEAVE"
-  | "HOLIDAY"
-  | "WEEKLY_OFF";
+export type VisionStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "LEAVE" | "HOLIDAY" | "WEEKLY_OFF";
 
 export interface VisionDraftRecord {
   employeeId: number;
@@ -30,11 +24,12 @@ export interface VisionExtractionResult {
 
 function makeSafeName(file: File) {
   const extension = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const cleanName = file.name
-    .replace(/\.[^.]+$/, "")
-    .replace(/[^a-zA-Z0-9_-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "") || "timesheet";
+  const cleanName =
+    file.name
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-zA-Z0-9_-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "") || "timesheet";
   return `${Date.now()}-${cleanName}.${extension}`;
 }
 
@@ -50,7 +45,7 @@ async function readFileAsBase64(file: File) {
 }
 
 async function callOpenRouterVision(file: File, employees: Array<{ id: number; name: string }>) {
-  const apiKey = import.meta.env['VITE_OPENROUTER_API_KEY'];
+  const apiKey = import.meta.env["VITE_OPENROUTER_API_KEY"];
   if (!apiKey) {
     return {
       records: employees.map((employee, index) => ({
@@ -126,15 +121,18 @@ async function callOpenRouterVision(file: File, employees: Array<{ id: number; n
   const parsed = typeof parsedContent === "string" ? JSON.parse(parsedContent) : parsedContent;
   const records = Array.isArray(parsed?.records)
     ? parsed.records.map((record: Record<string, unknown>) => ({
-        employeeId: Number(record['employeeId'] ?? record['id'] ?? 0),
-        employeeName: typeof record['employeeName'] === "string" ? record['employeeName'] : undefined,
-        status: (record['status'] as VisionStatus) || "PRESENT",
-        inTime: typeof record['inTime'] === "string" ? record['inTime'] : undefined,
-        outTime: typeof record['outTime'] === "string" ? record['outTime'] : undefined,
-        breakHours: typeof record['breakHours'] === "number" ? record['breakHours'] : undefined,
-        regularHours: typeof record['regularHours'] === "number" ? record['regularHours'] : undefined,
-        overtimeHours: typeof record['overtimeHours'] === "number" ? record['overtimeHours'] : undefined,
-        remarks: typeof record['remarks'] === "string" ? record['remarks'] : undefined,
+        employeeId: Number(record["employeeId"] ?? record["id"] ?? 0),
+        employeeName:
+          typeof record["employeeName"] === "string" ? record["employeeName"] : undefined,
+        status: (record["status"] as VisionStatus) || "PRESENT",
+        inTime: typeof record["inTime"] === "string" ? record["inTime"] : undefined,
+        outTime: typeof record["outTime"] === "string" ? record["outTime"] : undefined,
+        breakHours: typeof record["breakHours"] === "number" ? record["breakHours"] : undefined,
+        regularHours:
+          typeof record["regularHours"] === "number" ? record["regularHours"] : undefined,
+        overtimeHours:
+          typeof record["overtimeHours"] === "number" ? record["overtimeHours"] : undefined,
+        remarks: typeof record["remarks"] === "string" ? record["remarks"] : undefined,
       }))
     : [];
 
@@ -170,7 +168,9 @@ export async function uploadTimesheetImage(file: File) {
 
   const { data, error: linkError } = await db.storage.from(storageName).createSignedUrl(path, 3600);
   if (linkError || !data) {
-    throw new Error(`Image uploaded, but could not open it: ${linkError?.message ?? "No image link returned"}`);
+    throw new Error(
+      `Image uploaded, but could not open it: ${linkError?.message ?? "No image link returned"}`,
+    );
   }
   return {
     storagePath: path,
@@ -215,7 +215,10 @@ export async function extractAttendanceFromImage(
       records,
       sourceUrl: uploaded.publicUrl,
       storagePath: uploaded.storagePath,
-      warnings: [...(parsed.warnings ?? []), ...(records.length === 0 ? ["No rows were detected."] : [])].filter(Boolean),
+      warnings: [
+        ...(parsed.warnings ?? []),
+        ...(records.length === 0 ? ["No rows were detected."] : []),
+      ].filter(Boolean),
       note: parsed.note,
     };
   } catch (error) {

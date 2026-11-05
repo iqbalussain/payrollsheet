@@ -30,7 +30,8 @@ export function DiagnosticsTab() {
           disabled={query.isFetching}
           className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-muted disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /> Re-run checks
+          <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /> Re-run
+          checks
         </button>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">

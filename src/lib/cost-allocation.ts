@@ -28,9 +28,7 @@ export function buildAllocationRows(
   openingBalances: ReadonlyMap<number, number> = new Map(),
 ): AllocationRow[] {
   const byId = new Map(employees.map((employee) => [employee.id, employee]));
-  const linesByPayrollLineId = new Map(
-    (payrollLines ?? []).map((line) => [line.id, line]),
-  );
+  const linesByPayrollLineId = new Map((payrollLines ?? []).map((line) => [line.id, line]));
 
   const groups = new Map<string, PayrollSiteAllocation[]>();
   for (const allocation of allocations) {
@@ -41,11 +39,22 @@ export function buildAllocationRows(
   const apportioned = new Map<string, number>();
   const share = (allocation: PayrollSiteAllocation, amount: number, field: string) => {
     const group = groups.get(allocation.payroll_line_id) ?? [allocation];
-    const totalHours = group.reduce((sum, row) => sum + Number(row.regular_hours) + Number(row.overtime_hours), 0);
+    const totalHours = group.reduce(
+      (sum, row) => sum + Number(row.regular_hours) + Number(row.overtime_hours),
+      0,
+    );
     const key = `${allocation.payroll_line_id}:${field}`;
-    const value = group.at(-1)?.id === allocation.id
-      ? amount - (apportioned.get(key) ?? 0)
-      : Math.round(amount * (totalHours > 0 ? (Number(allocation.regular_hours) + Number(allocation.overtime_hours)) / totalHours : 1 / group.length) * 1000) / 1000;
+    const value =
+      group.at(-1)?.id === allocation.id
+        ? amount - (apportioned.get(key) ?? 0)
+        : Math.round(
+            amount *
+              (totalHours > 0
+                ? (Number(allocation.regular_hours) + Number(allocation.overtime_hours)) /
+                  totalHours
+                : 1 / group.length) *
+              1000,
+          ) / 1000;
     apportioned.set(key, (apportioned.get(key) ?? 0) + value);
     return Math.round(value * 1000) / 1000;
   };
@@ -59,8 +68,19 @@ export function buildAllocationRows(
     const grossSalary = regularHours * rate;
     const foodDeduction = share(allocation, Number(line?.food_deduction ?? 0), "food");
     const advanceDeduction = share(allocation, Number(line?.prev_advance ?? 0), "advance");
-    const outstanding = share(allocation, Math.max(0, (openingBalances.get(allocation.employee_id) ?? 0) + Number(line?.new_advance ?? 0) - Number(line?.prev_advance ?? 0)), "outstanding");
-    const netPay = line ? share(allocation, Number(line.net_pay ?? line.net_salary ?? 0), "net") : grossSalary - foodDeduction - advanceDeduction;
+    const outstanding = share(
+      allocation,
+      Math.max(
+        0,
+        (openingBalances.get(allocation.employee_id) ?? 0) +
+          Number(line?.new_advance ?? 0) -
+          Number(line?.prev_advance ?? 0),
+      ),
+      "outstanding",
+    );
+    const netPay = line
+      ? share(allocation, Number(line.net_pay ?? line.net_salary ?? 0), "net")
+      : grossSalary - foodDeduction - advanceDeduction;
     const paid = share(allocation, Number(line?.paid ?? 0), "paid");
     const balance = netPay - paid;
 

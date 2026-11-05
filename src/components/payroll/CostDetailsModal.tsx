@@ -52,12 +52,7 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
 
   const all = useMemo(
     () =>
-      buildAllocationRows(
-        allocationsQuery.data ?? [],
-        employees,
-        linesQuery.data,
-        openingBalances,
-      ),
+      buildAllocationRows(allocationsQuery.data ?? [], employees, linesQuery.data, openingBalances),
     [allocationsQuery.data, employees, linesQuery.data, openingBalances],
   );
 
@@ -197,7 +192,9 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                 {metric.icon && <Users size={12} />}
                 {metric.label}
               </p>
-              <p className={`mt-1 truncate font-display text-sm font-extrabold ${metric.money ? "text-money" : "text-navy"}`}>
+              <p
+                className={`mt-1 truncate font-display text-sm font-extrabold ${metric.money ? "text-money" : "text-navy"}`}
+              >
                 {metric.value}
               </p>
             </div>
@@ -251,30 +248,18 @@ export function CostDetailsModal({ open, onClose, employees, month = "", notify 
                     <td className="px-3 py-2 text-slate-600">{r.site}</td>
                     <td className="px-3 py-2 text-slate-600">{r.foreman}</td>
                     <td className="px-3 py-2 text-slate-600">{r.month}</td>
-                    <td className="px-3 py-2 text-right text-slate-600">
-                      {fmt(r.regularHours)}
-                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">{fmt(r.regularHours)}</td>
                     <td className="px-3 py-2 text-right font-medium text-slate-700">
                       {fmt(r.grossSalary)}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-600">
-                      {fmt(r.foodDeduction)}
-                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">{fmt(r.foodDeduction)}</td>
                     <td className="px-3 py-2 text-right text-slate-600">
                       {fmt(r.advanceDeduction)}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-600">
-                      {fmt(r.outstanding)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-bold text-navy">
-                      {fmt(r.netPay)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-bold text-money">
-                      {fmt(r.paid)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-bold text-navy">
-                      {fmt(r.balance)}
-                    </td>
+                    <td className="px-3 py-2 text-right text-slate-600">{fmt(r.outstanding)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-navy">{fmt(r.netPay)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-money">{fmt(r.paid)}</td>
+                    <td className="px-3 py-2 text-right font-bold text-navy">{fmt(r.balance)}</td>
                   </tr>
                 ))
               )}

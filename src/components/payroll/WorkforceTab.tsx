@@ -15,7 +15,11 @@ import type { Employee } from "@/lib/payroll";
 import { dbAny } from "@/integrations/supabase/external-client";
 import { useProjects } from "@/lib/management-data";
 import { projectAccessError } from "@/lib/project-access";
-import { normalizeSalaryHistory, salaryHistoryInsert, type SalaryHistoryRecord } from "@/lib/salary-history";
+import {
+  normalizeSalaryHistory,
+  salaryHistoryInsert,
+  type SalaryHistoryRecord,
+} from "@/lib/salary-history";
 import { btnGold, btnOutline, btnPrimary, card, input, select } from "./ui";
 
 interface SalaryRecord extends SalaryHistoryRecord {
@@ -109,17 +113,18 @@ export function WorkforceTab({
   const salaries = useQuery({
     queryKey: ["employee_salary_history"],
     queryFn: async () => {
-      const { data, error } = await dbAny
-        .from("employee_salary_history")
-        .select("*");
+      const { data, error } = await dbAny.from("employee_salary_history").select("*");
       if (error) throw error;
-      return (data ?? []).map((row: Record<string, unknown>) => ({
-        ...row,
-        ...normalizeSalaryHistory([row])[0],
-      })).sort((a: SalaryRecord, b: SalaryRecord) =>
-        (b.effective_from ?? "").localeCompare(a.effective_from ?? "") ||
-        b.created_at.localeCompare(a.created_at),
-      ) as SalaryRecord[];
+      return (data ?? [])
+        .map((row: Record<string, unknown>) => ({
+          ...row,
+          ...normalizeSalaryHistory([row])[0],
+        }))
+        .sort(
+          (a: SalaryRecord, b: SalaryRecord) =>
+            (b.effective_from ?? "").localeCompare(a.effective_from ?? "") ||
+            b.created_at.localeCompare(a.created_at),
+        ) as SalaryRecord[];
     },
   });
   const payrollSettings = useQuery({
