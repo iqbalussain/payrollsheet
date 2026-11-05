@@ -592,20 +592,21 @@ export function MonthlyAttendanceDialog({
       const lastMonthEntry = [...entries].reverse().find((entry) => entry.work_date < date);
       const priorEntry = lastMonthEntry ?? priorMonthEntry;
       const assignment = assignmentForDate(assignmentsQuery.data ?? [], date);
-      const assignedProjectId = assignment?.projectId;
-      const site = priorEntry?.site || assignment?.site || resolvedDefaultProject?.name || "";
-      const projectId =
-        priorEntry?.project_id ||
-        assignedProjectId ||
-        projects.find((project) => project.name === site)?.id ||
-        resolvedDefaultProject?.id ||
-        "";
+      // A dated deployment wins as a whole, including an intentionally unassigned foreman.
+      // Previous attendance is only a fallback when there is no active deployment.
+      const site = assignment ? assignment.site : priorEntry?.site || resolvedDefaultProject?.name || "";
+      const projectId = assignment
+        ? assignment.projectId || projects.find((project) => project.name === site)?.id || ""
+        : priorEntry?.project_id ||
+          projects.find((project) => project.name === site)?.id ||
+          resolvedDefaultProject?.id ||
+          "";
       nextDays[day] = {
         ...emptyDay(),
         site,
         projectId,
-        foreman: priorEntry?.foreman || assignment?.foreman || "",
-        foremanUserId: priorEntry?.foreman_user_id || assignment?.foremanUserId || "",
+        foreman: assignment ? assignment.foreman : priorEntry?.foreman || "",
+        foremanUserId: assignment ? assignment.foremanUserId : priorEntry?.foreman_user_id || "",
       };
     }
     setDays(nextDays);
