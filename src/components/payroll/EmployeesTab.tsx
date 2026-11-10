@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { ChevronRight, Eye, Pencil, Plus, Search, Users, X } from "lucide-react";
+import { ChevronRight, Eye, FileSpreadsheet, Pencil, Plus, Search, Users, X } from "lucide-react";
 import { TRADES, fmt, type Employee, type PayrollBatch } from "@/lib/payroll";
+import { BulkImportModal } from "@/components/employees/BulkImportModal";
 import { btnGold, btnIcon, btnOutline, card, input, select } from "./ui";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   onNew: () => void;
   onView: (e: Employee) => void;
   onEdit: (e: Employee) => void;
+  notify?: (msg: string, tone?: "ok" | "warn") => void;
 }
 
 const statusStyle: Record<string, string> = {
@@ -18,11 +20,12 @@ const statusStyle: Record<string, string> = {
   Cancelled: "bg-danger/10 text-danger border-danger/30",
 };
 
-export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Props) {
+export function EmployeesTab({ employees, loading, onNew, onView, onEdit, notify }: Props) {
   const [search, setSearch] = useState("");
   const [tradeFilter, setTradeFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [selectedId, setSelectedId] = useState("");
+  const [showBulkImport, setShowBulkImport] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -98,9 +101,19 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
             <Pencil size={15} /> Edit
           </button>
         </div>
-        <button onClick={onNew} className={btnGold}>
-          <Plus size={16} /> New employee
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowBulkImport(true)}
+            className={btnOutline}
+            title="Import employees in bulk via CSV"
+          >
+            <FileSpreadsheet size={16} /> Bulk Import
+          </button>
+          <button onClick={onNew} className={btnGold}>
+            <Plus size={16} /> New employee
+          </button>
+        </div>
       </div>
 
       <div className="mobile-filter-bar flex flex-col gap-3 sm:flex-row">
@@ -208,7 +221,7 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
 
       <div className={card + " hidden overflow-hidden sm:block"}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="border-b border-border bg-navy-soft text-left text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 <th className="px-4 py-3">S.No</th>
@@ -277,6 +290,14 @@ export function EmployeesTab({ employees, loading, onNew, onView, onEdit }: Prop
         <Users size={13} /> Showing {filtered.length} of {employees.length} employees — saved in the
         cloud database.
       </p>
+
+      <BulkImportModal
+        isOpen={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        onSuccess={() => setShowBulkImport(false)}
+        notify={notify ?? (() => {})}
+        existingEmployees={employees}
+      />
     </div>
   );
 }

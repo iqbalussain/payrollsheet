@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
+import QRCode from "qrcode";
 import {
   fmt,
   lineBalance,
@@ -202,7 +203,7 @@ function drawCard(
   doc.text(total.value, x + width - panelInset - 2, totalRowY, { align: "right" });
 }
 
-function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
+async function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
   const { employee: e, month, row } = slip;
   const pageWidth = 210;
   const left = 15;
@@ -342,6 +343,34 @@ function drawSlip(doc: jsPDF, slip: SlipInput, headerImage: HeaderImage) {
     "right",
   );
 
+  // In-memory verification QR code on lower right corner
+  try {
+    const qrPayload = JSON.stringify({
+      emp_id: Number(slip.employee.id),
+      period: slip.month,
+      net_pay_omr: Number(net.toFixed(3)),
+      advance_balance: Number(slip.outstandingAdvance.toFixed(3)),
+    });
+    const qrDataUrl = await QRCode.toDataURL(qrPayload, {
+      margin: 1,
+      width: 120,
+      color: {
+        dark: "#181d23",
+        light: "#ffffff",
+      },
+    });
+
+    const qrSize = 23;
+    const qrX = left + contentWidth - qrSize;
+    const qrY = 217;
+    doc.addImage(qrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+    doc.setFontSize(5.5);
+    doc.setTextColor(...MUTED);
+    doc.text("SCAN TO VERIFY", qrX + qrSize / 2, qrY + qrSize + 2.5, { align: "center" });
+  } catch (err) {
+    console.warn("Could not render salary slip QR code:", err);
+  }
+
   doc.setDrawColor(150, 156, 163);
   doc.setLineWidth(0.35);
   doc.line(left, 247, left + 56, 247);
@@ -387,7 +416,7 @@ function downloadBlob(blob: Blob, filename: string) {
 export async function generateSalarySlipPDF(slip: SlipInput, headerImage?: HeaderImage) {
   const resolvedHeaderImage = headerImage ?? (await loadHeaderImage());
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  drawSlip(doc, slip, resolvedHeaderImage);
+  await drawSlip(doc, slip, resolvedHeaderImage);
   return doc.output("blob");
 }
 

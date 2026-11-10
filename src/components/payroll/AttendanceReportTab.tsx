@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { CalendarDays, Clock3, MapPin, Printer, Users } from "lucide-react";
+import { CalendarDays, Clock3, FileDown, Loader2, MapPin, Printer, Users } from "lucide-react";
 import type { Employee } from "@/lib/payroll";
 import { useBatches, useTimesheetsForMonth, type TimesheetRecord } from "@/lib/payroll-data";
 import { useProjects } from "@/lib/management-data";
 import { currentPayrollMonth, fmt, monthLabel, payrollMonthOptions, toNum } from "@/lib/payroll";
+import { exportAnnexureAPDF } from "@/lib/pdf/generateAnnexureA";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { btnOutline, card, select } from "./ui";
+import { btnGold, btnOutline, card, select } from "./ui";
 
 interface Props {
   employees: Employee[];
@@ -274,6 +275,7 @@ export function AttendanceReportTab({ employees }: Props) {
   const [month, setMonth] = useState(currentPayrollMonth);
   const [employeeId, setEmployeeId] = useState("");
   const [site, setSite] = useState("");
+  const [exportingAnnexureA, setExportingAnnexureA] = useState(false);
   const timesheetsQuery = useTimesheetsForMonth(month);
   const batchesQuery = useBatches(month);
   const projectsQuery = useProjects(true);
@@ -415,14 +417,45 @@ export function AttendanceReportTab({ employees }: Props) {
             Review monthly hours by employee or work site.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className={`no-print ml-auto ${btnOutline}`}
-        >
-          <Printer size={16} />
-          Print Report
-        </button>
+        <div className="no-print ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const targetSite = site || sites[0] || "All Sites";
+              setExportingAnnexureA(true);
+              try {
+                await exportAnnexureAPDF(targetSite, month);
+              } catch (err) {
+                console.error("Failed to export Annexure A PDF:", err);
+              } finally {
+                setExportingAnnexureA(false);
+              }
+            }}
+            disabled={exportingAnnexureA}
+            className={`${btnGold} text-xs`}
+            title="Download verified Annexure A PDF for site performance audit"
+          >
+            {exportingAnnexureA ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                Generating Annexure A…
+              </>
+            ) : (
+              <>
+                <FileDown size={15} />
+                Export Annexure A (PDF)
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className={btnOutline}
+          >
+            <Printer size={16} />
+            Print Report
+          </button>
+        </div>
       </header>
 
       <div className={card + " no-print space-y-4 p-4"}>

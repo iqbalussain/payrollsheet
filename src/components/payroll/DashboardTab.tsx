@@ -4,6 +4,7 @@ import {
   Banknote,
   CalendarCheck,
   CalendarClock,
+  Camera,
   Clock3,
   FilePlus2,
   Plus,
@@ -33,6 +34,7 @@ interface Props {
   onCreatePayroll: () => void;
   onNewEmployee: () => void;
   onAddAdvance: () => void;
+  onCameraIntake?: () => void;
 }
 
 function localDate(value: Date) {
@@ -54,6 +56,7 @@ export function DashboardTab({
   onCreatePayroll,
   onNewEmployee,
   onAddAdvance,
+  onCameraIntake,
 }: Props) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -131,6 +134,15 @@ export function DashboardTab({
           <button type="button" onClick={onRecordAttendance} className={btnGold}>
             <CalendarCheck size={16} /> Record today’s attendance
           </button>
+          {onCameraIntake && (
+            <button
+              type="button"
+              onClick={onCameraIntake}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-400/50 bg-amber-500/20 px-4 py-2 text-sm font-bold text-amber-200 transition-colors hover:bg-amber-500/30"
+            >
+              <Camera size={16} /> Scan Timesheet Photo (OCR)
+            </button>
+          )}
           <button
             type="button"
             onClick={onCreatePayroll}

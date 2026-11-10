@@ -1,0 +1,34 @@
+{
+  "name": "Nexuspay Payroll Companion",
+  "short_name": "Nexuspay",
+  "description": "Mobile payroll, attendance intake, and cost allocation companion for site teams",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#202832",
+  "theme_color": "#202832",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Daily Timesheets",
+      "short_name": "Timesheets",
+      "url": "/?tab=timesheets",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "Camera Intake",
+      "short_name": "Intake",
+      "url": "/?tab=timesheets&mode=photo",
+      "icons": [{ "src": "/favicon.svg", "sizes": "96x96" }]
+    }
+  ]
+}

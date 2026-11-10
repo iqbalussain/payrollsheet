@@ -42,6 +42,7 @@ interface Props {
   onOpenWorkforce: () => void;
   notify: (message: string, tone?: "ok" | "warn") => void;
   onDirtyChange?: (dirty: boolean) => void;
+  initialMode?: "manual" | "photo";
 }
 
 type AttendanceStatus = TimesheetRecord["status"];
@@ -208,7 +209,7 @@ function MobileAttendanceCard({
             disabled={assignedExisting}
             onChange={onSelect}
             aria-label={`Select ${employee.name}`}
-            className="mt-1 h-4 w-4 shrink-0 accent-[var(--navy)] disabled:opacity-50"
+            className="mt-1 h-4 w-4 shrink-0 accent-navy disabled:opacity-50"
           />
           <div className="min-w-0 flex-1">
             <p className="whitespace-normal text-sm font-semibold leading-snug text-navy">
@@ -329,6 +330,7 @@ export function TimesheetsTab({
   onOpenWorkforce,
   notify,
   onDirtyChange,
+  initialMode,
 }: Props) {
   const isMobile = useIsMobile();
   const [workDate, setWorkDate] = useState(today);
@@ -435,7 +437,10 @@ export function TimesheetsTab({
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState<AttendanceStatus | "">("");
   const [copyPickerOpen, setCopyPickerOpen] = useState(false);
   const [monthlyAttendanceOpen, setMonthlyAttendanceOpen] = useState(false);
-  const [attendanceMode, setAttendanceMode] = useState<"manual" | "photo">("manual");
+  const [attendanceMode, setAttendanceMode] = useState<"manual" | "photo">(initialMode || "manual");
+  useEffect(() => {
+    if (initialMode) setAttendanceMode(initialMode);
+  }, [initialMode]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [bulkInTime, setBulkInTime] = useState("06:00");
   const [bulkOutTime, setBulkOutTime] = useState("17:00");
@@ -1443,7 +1448,7 @@ export function TimesheetsTab({
           <section
             role="dialog"
             aria-modal="true"
-            className="attendance-sheet fixed inset-0 z-[60] flex h-[100dvh] items-stretch justify-center bg-foreground/40 backdrop-blur-sm sm:items-center sm:p-4"
+            className="attendance-sheet fixed inset-0 z-60 flex h-dvh items-stretch justify-center bg-foreground/40 backdrop-blur-sm sm:items-center sm:p-4"
             aria-label="Daily timesheet editor"
           >
             <div className="attendance-dialog flex h-full w-full max-w-6xl flex-col gap-3 overflow-y-auto bg-[linear-gradient(180deg,#fbfcff_0%,#f4f7fb_100%)] p-3 shadow-[0_30px_70px_rgba(15,23,42,0.18)] sm:h-auto sm:max-h-[92vh] sm:rounded-2xl sm:p-5">
@@ -1481,7 +1486,7 @@ export function TimesheetsTab({
                         setWorkDate(nextDate);
                         setCopyPickerOpen(false);
                       }}
-                      className="w-[8.25rem] bg-transparent text-xs font-semibold text-navy focus:outline-none"
+                      className="w-33 bg-transparent text-xs font-semibold text-navy focus:outline-none"
                     />
                   </label>
                   <button
@@ -1841,7 +1846,7 @@ export function TimesheetsTab({
                                           (assignedOutsideBatch && !checked) || lockedInBatch,
                                         )}
                                         onChange={() => toggleEmployee(employee)}
-                                        className="h-4 w-4 accent-[var(--navy)]"
+                                        className="h-4 w-4 accent-navy"
                                       />
                                       <span className="min-w-0 flex-1">
                                         <span className="block truncate font-semibold text-navy">
@@ -2030,7 +2035,7 @@ export function TimesheetsTab({
                               type="checkbox"
                               checked={visibleColumns[value]}
                               onChange={() => toggleColumn(value)}
-                              className="h-4 w-4 accent-[var(--navy)]"
+                              className="h-4 w-4 accent-navy"
                             />
                             {label}
                           </label>
@@ -2053,7 +2058,7 @@ export function TimesheetsTab({
                               <tr className="h-8 border-b border-border text-[10px] font-bold uppercase tracking-wide text-slate-500">
                                 <th className="w-9 px-2 text-center" aria-label="Selected" />
                                 <th className="w-22 px-2 text-left">Status</th>
-                                <th className="sticky left-[164px] z-20 w-36 bg-slate-100 px-2 text-left">
+                                <th className="sticky left-41 z-20 w-36 bg-slate-100 px-2 text-left">
                                   Employee
                                 </th>
                                 <th className="w-36 px-2 text-left">Role / Phone</th>
@@ -2128,7 +2133,7 @@ export function TimesheetsTab({
                                           disabled={assignedExisting}
                                           onChange={() => toggleEmployee(employee)}
                                           aria-label={`Select ${employee.name}`}
-                                          className="h-3.5 w-3.5 accent-[var(--navy)] disabled:opacity-50"
+                                          className="h-3.5 w-3.5 accent-navy disabled:opacity-50"
                                         />
                                       </td>
                                       <td className="px-2">
@@ -2150,7 +2155,7 @@ export function TimesheetsTab({
                                         </select>
                                       </td>
                                       <td
-                                        className="sticky left-[164px] z-10 max-w-36 truncate bg-card px-2 font-semibold text-navy"
+                                        className="sticky left-41 z-10 max-w-36 truncate bg-card px-2 font-semibold text-navy"
                                         title={employee.name}
                                       >
                                         {employee.name}
@@ -2334,7 +2339,7 @@ export function TimesheetsTab({
                       </p>
                     )}
                     <div className="overflow-x-auto rounded-md border border-border bg-card">
-                      <table className="w-full min-w-[760px] border-collapse text-xs">
+                      <table className="w-full min-w-190 border-collapse text-xs">
                         <thead className="bg-slate-100">
                           <tr className="h-8 border-b border-border text-left text-[10px] font-bold uppercase tracking-wide text-slate-500">
                             <th className="w-10 px-2">#</th>

@@ -25,6 +25,7 @@ import {
   UserRound,
   Stethoscope,
   Trash2,
+  MapPin,
 } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 
@@ -92,6 +93,11 @@ const DeleteOnlyTab = lazy(() =>
     default: module.DeleteOnlyTab,
   })),
 );
+const SiteMap = lazy(() =>
+  import("@/components/sites/SiteMap").then((module) => ({
+    default: module.SiteMap,
+  })),
+);
 import {
   EmployeeModal,
   type EmployeeForm,
@@ -147,6 +153,7 @@ const TABS = [
   { id: "payroll", label: "Monthly Payroll", icon: Save },
   { id: "timesheets", label: "Daily Timesheets", icon: Clock3 },
   { id: "attendance", label: "Attendance Report", icon: CalendarDays },
+  { id: "sites", label: "GIS Site Map", icon: MapPin },
   { id: "advances", label: "Advances", icon: Banknote },
   { id: "history", label: "Employee History", icon: History },
   { id: "slips", label: "Salary Slips", icon: FileDown },
@@ -285,6 +292,7 @@ function Dashboard({
   const queryClient = useQueryClient();
   const canAccessDeletePage = email.trim().toLowerCase() === "iqbalussain@gmail.com";
   const [tab, setTab] = useState<TabId>(role === "foreman" ? "timesheets" : "overview");
+  const [timesheetMode, setTimesheetMode] = useState<"manual" | "photo">("manual");
   const [mode, setMode] = useState<ModalMode>(null);
   const [form, setForm] = useState<EmployeeForm>(emptyForm);
   const [duplicateIdError, setDuplicateIdError] = useState("");
@@ -339,7 +347,7 @@ function Dashboard({
   const availableTabs = TABS.filter((item) => {
     if ("deleteOnly" in item && item.deleteOnly) return canAccessDeletePage;
     if ("adminOnly" in item && item.adminOnly && !canDelete) return false;
-    if (role === "foreman") return item.id === "timesheets" || item.id === "workforce";
+    if (role === "foreman") return item.id === "timesheets" || item.id === "workforce" || item.id === "sites";
     if (role === "manager") {
       return [
         "overview",
@@ -347,6 +355,7 @@ function Dashboard({
         "payroll",
         "timesheets",
         "attendance",
+        "sites",
         "advances",
         "history",
         "slips",
@@ -646,7 +655,7 @@ function Dashboard({
             The app could not refresh its local data from Supabase. Check your connection and retry.
           </p>
           {cacheError && (
-            <p className="mt-2 break-words text-xs text-danger" role="alert">
+            <p className="mt-2 wrap-break-word text-xs text-danger" role="alert">
               {cacheError}
             </p>
           )}
@@ -772,7 +781,14 @@ function Dashboard({
                 batches={batches}
                 advances={advances}
                 email={email}
-                onRecordAttendance={() => navigateToTab("timesheets")}
+                onRecordAttendance={() => {
+                  setTimesheetMode("manual");
+                  navigateToTab("timesheets");
+                }}
+                onCameraIntake={() => {
+                  setTimesheetMode("photo");
+                  navigateToTab("timesheets");
+                }}
                 onCreatePayroll={() => navigateToTab("payroll")}
                 onNewEmployee={() => {
                   setForm(emptyForm);
@@ -791,12 +807,14 @@ function Dashboard({
                 onSave={(rows) => saveTimesheets.mutateAsync(rows)}
                 onOpenWorkforce={() => navigateToTab("workforce")}
                 notify={notify}
+                initialMode={timesheetMode}
                 onDirtyChange={(dirty) => {
                   attendanceDirtyRef.current = dirty;
                 }}
               />
             )}
             {tab === "attendance" && <AttendanceReportTab employees={employees} />}
+            {tab === "sites" && <SiteMap />}
             {tab === "workforce" && (
               <WorkforceTab employees={employees} role={role} notify={notify} />
             )}
@@ -805,6 +823,7 @@ function Dashboard({
                 employees={employees}
                 batches={batches}
                 loading={employeesQuery.isLoading}
+                notify={notify}
                 onNew={() => {
                   setForm(emptyForm);
                   setMode("new");
@@ -969,7 +988,7 @@ function Dashboard({
 
       {toast && (
         <div
-          className={`fixed bottom-24 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg sm:bottom-5 ${
+          className={`fixed bottom-24 left-1/2 z-60 flex -translate-x-1/2 items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-lg sm:bottom-5 ${
             toast.tone === "warn" ? "bg-danger" : "bg-money"
           }`}
         >

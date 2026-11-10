@@ -522,6 +522,84 @@ export type Database = {
         };
         Relationships: [];
       };
+      site_allocations: {
+        Row: {
+          id: string;
+          site_id: string | null;
+          site_name: string;
+          latitude: number | null;
+          longitude: number | null;
+          trade: string | null;
+          worker_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id?: string | null;
+          site_name: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          trade?: string | null;
+          worker_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string | null;
+          site_name?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+          trade?: string | null;
+          worker_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      attendance: {
+        Row: {
+          id: string;
+          employee_id: number;
+          site_id: string | null;
+          work_date: string;
+          verified_hours: number;
+          overtime_hours: number;
+          status: string;
+          foreman: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: number;
+          site_id?: string | null;
+          work_date: string;
+          verified_hours?: number;
+          overtime_hours?: number;
+          status?: string;
+          foreman?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          employee_id?: number;
+          site_id?: string | null;
+          work_date?: string;
+          verified_hours?: number;
+          overtime_hours?: number;
+          status?: string;
+          foreman?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

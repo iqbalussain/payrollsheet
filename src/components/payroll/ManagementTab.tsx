@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, LoaderCircle, Pencil, Plus, UserRound, X } from "lucide-react";
+import { Check, Compass, LoaderCircle, Pencil, Plus, UserRound, X } from "lucide-react";
 import { dbAny } from "@/integrations/supabase/external-client";
 import { useActiveForemen, useManagedUsers, useProjects } from "@/lib/management-data";
 import type { ManagedUser, Project } from "@/lib/management-data";
 import { saveManagedProject, saveManagedUser } from "@/lib/management.functions";
 import { projectAccessError } from "@/lib/project-access";
+import { SiteMap } from "@/components/sites/SiteMap";
 import { btnOutline, btnPrimary, card, input, select, th } from "./ui";
 
 type Role = ManagedUser["role"];
@@ -76,6 +77,7 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
   );
   const [userDraft, setUserDraft] = useState<UserDraft>(blankUser);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(blankProject);
+  const [showMap, setShowMap] = useState(false);
   const [userMessage, setUserMessage] = useState<{ text: string; error: boolean } | null>(null);
   const [projectMessage, setProjectMessage] = useState<{
     text: string;
@@ -428,7 +430,7 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
           />
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-sm">
+          <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="border-b border-border">
                 <th className={th}>Name</th>
@@ -507,16 +509,28 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
               Deactivation keeps project links and historical attendance/payroll intact.
             </p>
           </div>
-          {projectDraft.projectId && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              className={btnOutline}
-              onClick={() => setProjectDraft(blankProject)}
+              className={`${btnOutline} text-xs`}
+              onClick={() => setShowMap(!showMap)}
             >
-              <X size={14} /> Cancel edit
+              <Compass size={14} className="mr-1" />
+              {showMap ? "Hide GIS Map" : "Open GIS Map"}
             </button>
-          )}
+            {projectDraft.projectId && (
+              <button
+                type="button"
+                className={btnOutline}
+                onClick={() => setProjectDraft(blankProject)}
+              >
+                <X size={14} /> Cancel edit
+              </button>
+            )}
+          </div>
         </div>
+
+        {showMap && <SiteMap className="mb-4" height="420px" />}
         <form
           className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2 xl:grid-cols-6"
           onSubmit={(event) => {
@@ -655,7 +669,7 @@ export function ManagementTab({ currentUserId }: { currentUserId: string }) {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] text-sm">
+          <table className="w-full min-w-155 text-sm">
             <thead>
               <tr className="border-b border-border">
                 <th className={th}>Project</th>
