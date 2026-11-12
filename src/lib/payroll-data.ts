@@ -1,3 +1,4 @@
+import { savePayrollLines } from "@/lib/payroll-lines.functions";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { db as supabase, dbAny } from "@/integrations/supabase/external-client";
 import type { Tables, TablesInsert } from "@/integrations/supabase/external-types";
@@ -500,12 +501,9 @@ export function useSaveBatch(canDelete = false) {
       }
 
       if (rows.length) {
-        const { data, error } = await supabase
-          .from("payroll_lines")
-          .upsert(rows as never, { onConflict: "id" })
-          .select("*");
-        if (error) throw error;
-        await writeCachedRows("payroll_lines", data ?? []);
+        // Saved server-side so advance amounts are authorised by role, not trusted from the browser.
+        const { rows: saved } = await savePayrollLines({ data: { rows } as never });
+        await writeCachedRows("payroll_lines", saved as never);
       }
 
       if (batch.id && canDelete) {
