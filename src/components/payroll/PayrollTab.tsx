@@ -3,6 +3,7 @@ import {
   proratedFood,
   siteAdvanceDeduction,
   siteDayShare,
+  sameSite,
 } from "@/lib/multi-site-payroll";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -629,8 +630,8 @@ export function PayrollTab({
   );
 
   const locked = useMemo(
-    () => lockedEmployeeIds(batches, month, draft?.id ?? null),
-    [batches, month, draft?.id],
+    () => lockedEmployeeIds(batches, month, draft?.id ?? null, draft ? draft.site : generationSite),
+    [batches, month, draft?.id, draft?.site, generationSite],
   );
 
   const foodDeductionForEmployee = (employeeId: number) => {
@@ -715,7 +716,7 @@ export function PayrollTab({
     const monthlyEntries = timesheets.filter(
       (entry) =>
         entry.work_date.startsWith(`${month}-`) &&
-        (!generationSite || entry.site.trim() === generationSite),
+        (!generationSite || sameSite(entry.site, generationSite)),
     );
     if (!monthlyEntries.length) {
       notify(
@@ -803,9 +804,19 @@ export function PayrollTab({
         (entry) => entry.employee_id === employeeId && entry.work_date.startsWith(`${month}-`),
       );
       const share = siteDayShare(employeeMonthEntries, generationSite);
-      const foodDeduction = proratedFood(foodDeductionForEmployee(employeeId), share);
+      const foodAlreadyThisMonth = monthBatches
+        .filter((batch) => batch.id !== draft?.id)
+        .flatMap((batch) => batch.lines)
+        .filter((line) => Number(line.employee_id) === employeeId)
+        .reduce((sum, line) => sum + toNum(line.food_deduction), 0);
+      const monthlyFood = foodDeductionForEmployee(employeeId);
+      // Never deduct more food across all site batches than the monthly amount.
+      const foodDeduction = Math.max(
+        0,
+        Math.min(proratedFood(monthlyFood, share), monthlyFood - foodAlreadyThisMonth),
+      );
       const isLastSite =
-        !generationSite || lastActiveSite(employeeMonthEntries) === generationSite;
+        !generationSite || sameSite(lastActiveSite(employeeMonthEntries), generationSite);
       const appliedThisMonth = monthBatches
         .filter((batch) => batch.id !== draft?.id)
         .flatMap((batch) => batch.lines)
@@ -1244,7 +1255,7 @@ export function PayrollTab({
 
   const changeStatus = async (batch: PayrollBatch, status: PayrollBatchStatus) => {
     if (status === "APPROVED") {
-      const otherBatchEmployees = lockedEmployeeIds(batches, batch.month, batch.id);
+      const otherBatchEmployees = lockedEmployeeIds(batches, batch.month, batch.id, batch.site);
       const issues = validateBatch(
         batch,
         batch.month,

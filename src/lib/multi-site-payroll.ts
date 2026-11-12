@@ -6,6 +6,9 @@
  */
 export type SiteEntry = { work_date: string; site: string; status?: string | null };
 
+const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
+export const sameSite = (a?: string | null, b?: string | null) => norm(a) === norm(b);
+
 const isActive = (e: SiteEntry) => !e.status || e.status === "PRESENT" || e.status === "HALF_DAY";
 
 /** Share of the month's active attendance days worked at `site` (1 when no site filter). */
@@ -14,7 +17,7 @@ export function siteDayShare(entries: SiteEntry[], site: string): number {
   const all = new Set(entries.filter(isActive).map((e) => e.work_date));
   if (!all.size) return 1;
   const atSite = new Set(
-    entries.filter((e) => isActive(e) && e.site.trim() === site).map((e) => e.work_date),
+    entries.filter((e) => isActive(e) && norm(e.site) === norm(site)).map((e) => e.work_date),
   );
   return atSite.size / all.size;
 }

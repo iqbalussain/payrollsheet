@@ -351,10 +351,19 @@ export function lockedEmployeeIds(
   batches: PayrollBatch[],
   month: string,
   currentBatchId: string | null,
+  site?: string | null,
 ) {
+  // Site-aware: a transferred employee may have one line per site in the same month.
+  const norm = (v?: string | null) => (v ?? "").trim().toLowerCase();
+  const isAll = (v?: string | null) => !norm(v) || norm(v) === "multiple sites" || norm(v) === "all sites";
   const set = new Set<string>();
   batches
-    .filter((b) => b.month === month && b.id !== currentBatchId)
+    .filter(
+      (b) =>
+        b.month === month &&
+        b.id !== currentBatchId &&
+        (site === undefined || isAll(site) || isAll(b.site) || norm(b.site) === norm(site)),
+    )
     .forEach((b) => b.lines.forEach((l) => l.employee_id && set.add(String(l.employee_id))));
   return set;
 }
