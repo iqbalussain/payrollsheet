@@ -43,6 +43,13 @@ export const deletePayrollRecord = createServerFn({ method: "POST" })
       return { type: data.type, id: data.id };
     }
 
+    // Delete lines while the batch still exists: the line lifecycle trigger rejects
+    // cascaded line deletes once the parent batch row is gone.
+    const { error: linesError } = await admin
+      .from("payroll_lines")
+      .delete()
+      .eq("batch_id", data.id);
+    if (linesError) throw new Error(`Could not delete payroll lines: ${linesError.message}`);
     const { data: deleted, error } = await admin
       .from("payroll_batches")
       .delete()
