@@ -1,3 +1,9 @@
+import {
+  lastActiveSite,
+  proratedFood,
+  siteAdvanceDeduction,
+  siteDayShare,
+} from "@/lib/multi-site-payroll";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
@@ -792,7 +798,36 @@ export function PayrollTab({
       if (total.overtimeHours > 0 && payrollPolicy.overtimeMultiplier === null) {
         return;
       }
-      const foodDeduction = foodDeductionForEmployee(employeeId);
+      // Option A: prorate food by site days; recover advances only at the last active site.
+      const employeeMonthEntries = timesheets.filter(
+        (entry) => entry.employee_id === employeeId && entry.work_date.startsWith(`${month}-`),
+      );
+      const share = siteDayShare(employeeMonthEntries, generationSite);
+      const foodDeduction = proratedFood(foodDeductionForEmployee(employeeId), share);
+      const isLastSite =
+        !generationSite || lastActiveSite(employeeMonthEntries) === generationSite;
+      const appliedThisMonth = monthBatches
+        .filter((batch) => batch.id !== draft?.id)
+        .flatMap((batch) => batch.lines)
+        .filter((line) => Number(line.employee_id) === employeeId)
+        .reduce((sum, line) => sum + toNum(line.prev_advance), 0);
+      const pendingAdvance = Math.max(0, carryForward(employeeId) - appliedThisMonth);
+      const grossEstimate = calculatePayroll({
+        regularHours,
+        overtimeHours,
+        rate: effectiveRate,
+        rateSegments,
+        allowances: 0,
+        deductions: 0,
+        advanceRecovery: 0,
+        policy: payrollPolicy,
+      }).grossPay;
+      const advanceDeduction = siteAdvanceDeduction({
+        pendingAdvance,
+        grossSitePay: grossEstimate,
+        proratedFood: foodDeduction,
+        isLastSite,
+      });
       const finalCalculation = calculatePayroll({
         regularHours,
         overtimeHours,
@@ -800,7 +835,7 @@ export function PayrollTab({
         rateSegments,
         allowances: 0,
         deductions: foodDeduction,
-        advanceRecovery: 0,
+        advanceRecovery: advanceDeduction,
         policy: payrollPolicy,
       });
       const line: PayrollLine = {
@@ -814,7 +849,7 @@ export function PayrollTab({
         rate: effectiveRate,
         rate_segments: rateSegments,
         food_deduction: foodDeduction,
-        prev_advance: "",
+        prev_advance: advanceDeduction || "",
         new_advance: 0,
         other_deduction: 0,
         net_salary: finalCalculation.netPay,
